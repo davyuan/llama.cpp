@@ -12655,15 +12655,15 @@ static void ggml_compute_forward_mul_mat(
         GGML_ASSERT(sizeof(bitnet_float_type) == 4);
 
         const int bits = ggml_bitnet_get_type_bits(type);
-        // src0: weight,     ne00 = k, ne01 = n
-        // src1: activation, ne10 = k, ne11 = m
+        // src0: weight,     ne00 = m, ne01 = k
+        // src1: activation, ne10 = k, ne11 = n
         char * wdata = params->wdata;
 
         struct bitnet_tensor_extra * wt = src0->extra;
         char * cur_wdata = wdata;
         bitnet_float_type * bitnet_f_ptr = wdata;
         if (sizeof(bitnet_float_type) == 2) {
-            cur_wdata = wdata + MAX(ne10, ne01) * ne11 * sizeof(bitnet_float_type);
+            cur_wdata = wdata + MAX(ne10, ne00) * ne11 * sizeof(bitnet_float_type);
         };
         int8_t * qlut = cur_wdata;
         bitnet_float_type * lut_scales = (bitnet_float_type *) (qlut + ne10 * ne11 * 16);
@@ -12681,7 +12681,7 @@ static void ggml_compute_forward_mul_mat(
                 GGML_ASSERT(src1->type == GGML_TYPE_F32);
                 bitnet_float_type * act_input;
                 act_input = src1->data;
-                ggml_preprocessor(ne01, ne10, act_input + (j * ne10), lut_scales, qlut);
+                ggml_preprocessor(ne00, ne10, act_input + (j * ne10), lut_scales, qlut);
             }
 
             ggml_barrier(params->threadpool);
@@ -12692,12 +12692,10 @@ static void ggml_compute_forward_mul_mat(
             } else {
                 act_output = dst->data;
             }
-            const int n_tile_num = wt->n_tile_num;
-            GGML_ASSERT(ne0 % n_tile_num == 0);
 
             const int range_per_thread_ii = ne01 / nth;
             for (int ii = ith * range_per_thread_ii; ii < (ith + 1) * range_per_thread_ii; ii += BM) {          
-                ggml_qgemm_lut( ne01, ne11, ne00, ii, j, ((uint8_t *)(wt->qweights)), 
+                ggml_qgemm_lut( ne00, ne11, ne10, ii, j, ((uint8_t *)(wt->qweights)), 
                                 qlut, 
                                 wt->scales, 
                                 lut_scales, 
