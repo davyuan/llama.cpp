@@ -1149,7 +1149,7 @@ if (CMAKE_OSX_ARCHITECTURES      STREQUAL "arm64" OR
             list(APPEND ARCH_FLAGS -mno-unaligned-access)
             # BitNet TL1 specific optimization for Cortex-A72 (RPi 4)
             if (GGML_BITNET_ARM_TL1)
-                list(APPEND ARCH_FLAGS -march=armv8-a -mcpu=cortex-a72 -mtune=cortex-a72 -ffast-math -fno-finite-math-only)
+                list(APPEND ARCH_FLAGS -march=armv8-a -mcpu=cortex-a72 -mtune=cortex-a72)
             endif()            
         endif()
         if (GGML_SVE)
