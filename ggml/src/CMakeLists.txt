@@ -1147,6 +1147,10 @@ if (CMAKE_OSX_ARCHITECTURES      STREQUAL "arm64" OR
             # Android arm64-v8a
             # Raspberry Pi 3, 4, Zero 2 (32-bit)
             list(APPEND ARCH_FLAGS -mno-unaligned-access)
+            # BitNet TL1 specific optimization for Cortex-A72 (RPi 4)
+            if (GGML_BITNET_ARM_TL1)
+                list(APPEND ARCH_FLAGS -march=armv8-a -mcpu=cortex-a72 -mtune=cortex-a72 -ffast-math)
+            endif()            
         endif()
         if (GGML_SVE)
             list(APPEND ARCH_FLAGS -march=armv8.6-a+sve)
