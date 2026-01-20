@@ -14,6 +14,9 @@
 #include <alloca.h>
 #endif
 
+const int BM = 128;
+const int BK = 64;
+
 #include <assert.h>
 #include <errno.h>
 #include <time.h>
@@ -12649,6 +12652,7 @@ static void ggml_compute_forward_mul_mat(
     //   compute by src0 rows
 #if defined(GGML_BITNET_ARM_TL1)
     if (ggml_bitnet_can_mul_mat(src0, src1, dst)) {
+        GGML_ASSERT(sizeof(bitnet_float_type) == 4);
 
         const int bits = ggml_bitnet_get_type_bits(type);
         // src0: weight,     ne00 = k, ne01 = n
@@ -12665,62 +12669,40 @@ static void ggml_compute_forward_mul_mat(
         bitnet_float_type * lut_scales = (bitnet_float_type *) (qlut + ne10 * ne11 * 16);
         bitnet_float_type * lut_biases = (bitnet_float_type *) (lut_scales + wt->lut_scales_size * ne11);
 
-        // g = 4
-        if (ith == 0) {
-            // Transform tensor if not already transformed
-            // Although we have done this in file `llama.cpp`,
-            // we still need to do it here for non-model inference, e.g., test-backend-ops.cpp.
-            // It's better to do this in ggml-backend.c,
-            // but llama.cpp directly manipulates tensor.data for cbe in a lot of space.
-            ggml_bitnet_transform_tensor(src0);
-            GGML_ASSERT(src1->type == GGML_TYPE_F32);
-            bitnet_float_type * act_input;
-            if (sizeof(bitnet_float_type) == 2) {
-                ggml_fp32_to_fp16_row(src1->data, bitnet_f_ptr, ne10 * ne11);
-                act_input = bitnet_f_ptr;
-            } else {
+        for(int j = 0; j < ne11; j++) {
+            // g = 4
+            if (ith == 0) {
+                // Transform tensor if not already transformed
+                // Although we have done this in file `llama.cpp`,
+                // we still need to do it here for non-model inference, e.g., test-backend-ops.cpp.
+                // It's better to do this in ggml-backend.c,
+                // but llama.cpp directly manipulates tensor.data for cbe in a lot of space.
+                ggml_bitnet_transform_tensor(src0);
+                GGML_ASSERT(src1->type == GGML_TYPE_F32);
+                bitnet_float_type * act_input;
                 act_input = src1->data;
+                ggml_preprocessor(ne01, ne10, act_input + (j * ne10), lut_scales, qlut);
             }
-            ggml_preprocessor(ne01, ne10, act_input, lut_scales, qlut);
-        }
 
-        ggml_barrier(params->threadpool);
+            ggml_barrier(params->threadpool);
 
-        bitnet_float_type * act_output;
-        if (sizeof(bitnet_float_type) == 2) {
-            act_output = bitnet_f_ptr;
-        } else {
-            act_output = dst->data;
-        }
-        const int n_tile_num = wt->n_tile_num;
-        GGML_ASSERT(ne0 % n_tile_num == 0);
-        const int w_size           = ne00 * ne01 / 4;
-        const int w_tile_size      = w_size / n_tile_num;
-        const int c_size           = ne01 * ne11;
-        const int c_tile_size      = c_size / n_tile_num;
-        const int lut_size         = ne11 * 16 * (ne10 / 2) * 2; // int8
-        const int lut_tile_size    = lut_size / n_tile_num;
-
-        const int th_tile_num = (n_tile_num + nth - 1) / nth;
-        const int th_tile_beg = ith * th_tile_num;
-        const int th_tile_end = MIN((ith + 1) * th_tile_num, n_tile_num);
-
-        for (int i_tile = th_tile_beg; i_tile < th_tile_end; i_tile++) {
-            const int w_offset          = i_tile * w_tile_size;
-            const int scales_offset     = 0;
-
-            const int qlut_offset       = 0;
-            const int lut_scales_offset = 0;
-            const int dst_offset        = i_tile * c_tile_size;
-
-            ggml_qgemm_lut( ne01, ne00, ((uint8_t *)(wt->qweights) + w_offset), 
-                            qlut, 
-                            wt->scales + scales_offset, 
-                            lut_scales + lut_scales_offset, 
-                            act_output + dst_offset);
+            bitnet_float_type * act_output;
             if (sizeof(bitnet_float_type) == 2) {
-                ggml_fp16_to_fp32_row(act_output + dst_offset, (float *) dst->data + dst_offset, ne01 / n_tile_num);
+                act_output = bitnet_f_ptr;
+            } else {
+                act_output = dst->data;
             }
+            const int n_tile_num = wt->n_tile_num;
+            GGML_ASSERT(ne0 % n_tile_num == 0);
+
+            const int range_per_thread_ii = ne01 / nth;
+            for (int ii = ith * range_per_thread_ii; ii < (ith + 1) * range_per_thread_ii; ii += BM) {          
+                ggml_qgemm_lut( ne01, ne11, ne00, ii, ((uint8_t *)(wt->qweights)), 
+                                qlut, 
+                                wt->scales, 
+                                lut_scales, 
+                                act_output);
+            }        
         }
         return;
     }
