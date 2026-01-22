@@ -12695,7 +12695,7 @@ static void ggml_compute_forward_mul_mat(
 
             const int range_per_thread_ii = ne00 / nth;
             for (int ii = ith * range_per_thread_ii; ii < (ith + 1) * range_per_thread_ii; ii += BM) {          
-                ggml_qgemm_lut( ne00, ne11, ne10, ii, j, ((uint8_t *)(wt->qweights)), 
+                ggml_qgemm_lut( ne00, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
                                 qlut, 
                                 wt->scales, 
                                 lut_scales, 
