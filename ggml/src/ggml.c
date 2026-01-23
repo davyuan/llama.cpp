@@ -738,10 +738,10 @@ static void ggml_vec_dot_bf16(int n, float * restrict s, size_t bs, ggml_bf16_t 
 static const struct ggml_type_traits type_traits[GGML_TYPE_COUNT] = {
     [GGML_TYPE_TL1] = {
         .type_name                = "tl1",
-        .blck_size                = 1,
+        .blck_size                = 4,
         .type_size                = sizeof(int8_t),
-        .is_quantized             = false,
-        .vec_dot                  = (ggml_vec_dot_t) ggml_vec_dot_f32,
+        .is_quantized             = true,
+        .vec_dot                  = (ggml_vec_dot_t) ggml_vec_dot_tl1,
         .vec_dot_type             = GGML_TYPE_F32,
         .nrows                    = 1,
     },
