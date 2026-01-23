@@ -12715,6 +12715,7 @@ static void ggml_compute_forward_mul_mat(
                                 LUT_Scales, 
                                 act_output);
             }        
+            ggml_barrier(params->threadpool); 
         }
 
         //clean up
