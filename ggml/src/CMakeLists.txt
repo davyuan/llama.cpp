@@ -1354,7 +1354,7 @@ add_library(ggml
             )
 
 if (EMSCRIPTEN)
-    set_target_properties(ggml PROPERTIES COMPILE_FLAGS "-msimd128")
+    set_target_properties(ggml PROPERTIES COMPILE_FLAGS "-msimd128 -Og")
 endif()
 
 target_compile_definitions(ggml PUBLIC    ${GGML_CDEF_PUBLIC})
