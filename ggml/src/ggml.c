@@ -12672,6 +12672,18 @@ static void ggml_compute_forward_mul_mat(
         bitnet_float_type * lut_scales = (bitnet_float_type *) (qlut + ne10 * ne11 * 16);
         bitnet_float_type * lut_biases = (bitnet_float_type *) (lut_scales + wt->lut_scales_size * ne11);
 
+        int8_t* QLUT = nullptr;    
+        bitnet_float_type* LUT_Scales = nullptr;
+        bitnet_float_type* Scales = nullptr;
+
+        if (ith == 0) {
+            QLUT = (int8_t*)GGML_ALIGNED_MALLOC(ne10 * 16 * sizeof(int8_t));
+            LUT_Scales = (bitnet_float_type*)GGML_ALIGNED_MALLOC(sizeof(bitnet_float_type));
+            Scales = (bitnet_float_type*)GGML_ALIGNED_MALLOC(sizeof(bitnet_float_type));
+            *Scales = 1.0f;
+        }
+        ggml_barrier(params->threadpool);
+
         for(int j = 0; j < ne11; j++) {
             // g = 4
             if (ith == 0) {
@@ -12684,9 +12696,8 @@ static void ggml_compute_forward_mul_mat(
                 GGML_ASSERT(src1->type == GGML_TYPE_F32);
                 bitnet_float_type * act_input;
                 act_input = src1->data;
-                ggml_preprocessor(ne00, ne10, act_input + (j * ne10), lut_scales, qlut);
+                ggml_preprocessor(ne00, ne10, act_input + (j * ne10), LUT_Scales, QLUT);
             }
-
             ggml_barrier(params->threadpool);
 
             bitnet_float_type * act_output;
@@ -12699,12 +12710,20 @@ static void ggml_compute_forward_mul_mat(
             const int range_per_thread_ii = ne00 / nth;
             for (int ii = ith * range_per_thread_ii; ii < (ith + 1) * range_per_thread_ii; ii += BM) {          
                 ggml_qgemm_lut( ne00, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
-                                qlut, 
-                                wt->scales, 
-                                lut_scales, 
+                                QLUT, 
+                                Scales, 
+                                LUT_Scales, 
                                 act_output);
             }        
         }
+
+        //clean up
+        if (ith == 0) {
+            GGML_ALIGNED_FREE(QLUT);
+            GGML_ALIGNED_FREE(LUT_Scales);
+            GGML_ALIGNED_FREE(Scales);
+        }
+        ggml_barrier(params->threadpool);        
         return;
     }
 #endif
