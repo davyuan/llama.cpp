@@ -1352,9 +1352,10 @@ add_library(ggml
             ${GGML_SOURCES_CANN}      ${GGML_HEADERS_CANN}
             ggml-aarch64.c            ggml-aarch64.h
             )
-
 if (EMSCRIPTEN)
-    set_target_properties(ggml PROPERTIES COMPILE_FLAGS "-msimd128 -Og")
+    set_target_properties(ggml PROPERTIES COMPILE_FLAGS "-msimd128")
+else()
+    set_target_properties(ggml PROPERTIES COMPILE_FLAGS "-Og")
 endif()
 
 target_compile_definitions(ggml PUBLIC    ${GGML_CDEF_PUBLIC})
