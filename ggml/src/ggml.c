@@ -12672,9 +12672,9 @@ static void ggml_compute_forward_mul_mat(
         bitnet_float_type * lut_scales = (bitnet_float_type *) (qlut + ne10 * ne11 * 16);
         bitnet_float_type * lut_biases = (bitnet_float_type *) (lut_scales + wt->lut_scales_size * ne11);
 
-        int8_t* QLUT = NULL;
-        bitnet_float_type* LUT_Scales = NULL;
-        bitnet_float_type* Scales = NULL;
+        static int8_t* QLUT = NULL;
+        static bitnet_float_type* LUT_Scales = NULL;
+        static bitnet_float_type* Scales = NULL;
 
         if (ith == 0) {
             QLUT = (int8_t*)GGML_ALIGNED_MALLOC(ne10 * 16 * sizeof(int8_t));
