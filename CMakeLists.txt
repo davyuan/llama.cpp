@@ -199,3 +199,6 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/llama.pc"
 
 add_subdirectory(common)
 add_subdirectory(examples)
+
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "-Og -g")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-Og -g")
