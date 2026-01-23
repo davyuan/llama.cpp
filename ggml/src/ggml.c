@@ -743,7 +743,7 @@ static const struct ggml_type_traits type_traits[GGML_TYPE_COUNT] = {
         .is_quantized             = true,
         .vec_dot                  = (ggml_vec_dot_t) ggml_vec_dot_tl1,
         .vec_dot_type             = GGML_TYPE_F32,
-        .nrows                    = 1,
+        .nrows                    = BM,
     },
     [GGML_TYPE_TL2] = {
         .type_name                = "tl2",
@@ -12653,6 +12653,9 @@ static void ggml_compute_forward_mul_mat(
 #if defined(GGML_BITNET_ARM_TL1)
     if (ggml_bitnet_can_mul_mat(src0, src1, dst)) {
         GGML_ASSERT(sizeof(bitnet_float_type) == 4);
+        GGML_ASSERT(ggml_is_contiguous(src0));
+        GGML_ASSERT(ggml_is_contiguous(src1));
+        GGML_ASSERT(ggml_is_contiguous(dst));
 
         const int bits = ggml_bitnet_get_type_bits(type);
         // src0: weight,     ne00 = m, ne01 = k
