@@ -238,6 +238,7 @@ class MODEL_ARCH(IntEnum):
     CHATGLM      = auto()
     BITNET       = auto()
     BITNET_25    = auto()
+    BITNET_B158  = auto()
     T5           = auto()
     T5ENCODER    = auto()
     JAIS         = auto()
@@ -400,6 +401,7 @@ MODEL_ARCH_NAMES: dict[MODEL_ARCH, str] = {
     MODEL_ARCH.CHATGLM:        "chatglm",
     MODEL_ARCH.BITNET:         "bitnet",
     MODEL_ARCH.BITNET_25:      "bitnet-25",
+    MODEL_ARCH.BITNET_B158:    "bitnet-b1.58",
     MODEL_ARCH.T5:             "t5",
     MODEL_ARCH.T5ENCODER:      "t5encoder",
     MODEL_ARCH.JAIS:           "jais",
