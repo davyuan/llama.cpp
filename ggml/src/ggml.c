@@ -12674,13 +12674,10 @@ static void ggml_compute_forward_mul_mat(
 
         static int8_t* QLUT = NULL;
         static bitnet_float_type* LUT_Scales = NULL;
-        static bitnet_float_type* Scales = NULL;
 
         if (ith == 0) {
             QLUT = (int8_t*)GGML_ALIGNED_MALLOC(ne10 * 16 * sizeof(int8_t));
             LUT_Scales = (bitnet_float_type*)GGML_ALIGNED_MALLOC(sizeof(bitnet_float_type));
-            Scales = (bitnet_float_type*)GGML_ALIGNED_MALLOC(sizeof(bitnet_float_type));
-            *Scales = 1.0f;
         }
         ggml_barrier(params->threadpool);
 
@@ -12711,7 +12708,7 @@ static void ggml_compute_forward_mul_mat(
             for (int ii = ith * range_per_thread_ii; ii < (ith + 1) * range_per_thread_ii; ii += BM) {          
                 ggml_qgemm_lut( ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
                                 QLUT, 
-                                Scales, 
+                                &(wt->scales[0]), 
                                 LUT_Scales, 
                                 act_output);
             }        
@@ -12722,7 +12719,6 @@ static void ggml_compute_forward_mul_mat(
         if (ith == 0) {
             GGML_ALIGNED_FREE(QLUT);
             GGML_ALIGNED_FREE(LUT_Scales);
-            GGML_ALIGNED_FREE(Scales);
         }
         ggml_barrier(params->threadpool);        
         return;
