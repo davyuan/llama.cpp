@@ -1452,6 +1452,8 @@ class GGMLQuantizationType(IntEnum):
     Q4_0_8_8 = 33
     TQ1_0   = 34
     TQ2_0   = 35
+    I2_S    = 36
+    I8_S    = 37
     TL1     = 38
     TL2     = 39
 
