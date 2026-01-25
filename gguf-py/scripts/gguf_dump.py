@@ -21,7 +21,7 @@ logger = logging.getLogger("gguf-dump")
 
 
 def get_file_host_endian(reader: GGUFReader) -> tuple[str, str]:
-    host_endian = 'LITTLE' if np.ndarray.newbyteorder(np.uint32(1), "<") == np.uint32(1) else 'BIG'
+    host_endian = 'LITTLE' if np.uint32(1) == np.uint32(1).newbyteorder("<") else 'BIG'
     if reader.byte_order == 'S':
         file_endian = 'BIG' if host_endian == 'LITTLE' else 'LITTLE'
     else:
