@@ -260,7 +260,7 @@ static const std::map<llm_arch, const char *> LLM_ARCH_NAMES = {
     { LLM_ARCH_CHATGLM,         "chatglm"      },
     { LLM_ARCH_BITNET,          "bitnet"       },
     { LLM_ARCH_BITNET_25,       "bitnet-25"    },
-    { LLM_ARCH_BITNET_B158,     "bitnet-b1.58"    },
+    { LLM_ARCH_BITNET_B158,     "bitnet-b1.58" },
     { LLM_ARCH_T5,              "t5"           },
     { LLM_ARCH_T5ENCODER,       "t5encoder"    },
     { LLM_ARCH_JAIS,            "jais"         },

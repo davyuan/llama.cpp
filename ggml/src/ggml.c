@@ -12651,7 +12651,7 @@ static void ggml_compute_forward_mul_mat(
     // nb01 >= nb00 - src0 is not transposed
     //   compute by src0 rows
 #if defined(GGML_BITNET_ARM_TL1)
-    if (ggml_bitnet_can_mul_mat(src0, src1, dst)) {
+    if (src0->type == GGML_TYPE_TL1  && ggml_bitnet_can_mul_mat(src0, src1, dst)) {
         GGML_ASSERT(sizeof(bitnet_float_type) == 4);
         GGML_ASSERT(ggml_is_contiguous(src0));
         GGML_ASSERT(ggml_is_contiguous(src1));
