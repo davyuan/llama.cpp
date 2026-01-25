@@ -146,10 +146,12 @@ class GGUFReader:
         itemsize = int(np.empty([], dtype = dtype).itemsize)
         end_offs = offset + itemsize * count
         data = self.data[offset:end_offs].view(dtype = dtype)[:count]
-        # Convert memmap to ndarray to ensure newbyteorder() is available
+        # Convert memmap to ndarray if needed
         if isinstance(data, np.memmap):
             data = np.asarray(data)
-        return data.newbyteorder(override_order or self.byte_order)
+        # Apply byte order using astype with the byte-ordered dtype
+        new_dtype = np.dtype(dtype).newbyteorder(override_order or self.byte_order)
+        return data.astype(new_dtype, copy=False)
 
     def _push_field(self, field: ReaderField, skip_sum: bool = False) -> int:
         if field.name in self.fields:
