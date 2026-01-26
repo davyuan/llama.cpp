@@ -13264,6 +13264,7 @@ UseGgmlGemm2:;
     if(strcmp(src0->name, "token_embd.weight")==0 && ith==0){
         //printf("mul_mat src0:%s src1:%s dst:%s ne0:%d ne1:%d ne2:%d ne3:%d\n", src0->name, src1->name, dst->name, dst->ne[0], dst->ne[1], dst->ne[2], dst->ne[3]);
         int n = 0;
+        n = n + 1;
     }
 }
 
