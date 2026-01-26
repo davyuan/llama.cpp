@@ -59,6 +59,46 @@ def dump_metadata(reader: GGUFReader, args: argparse.Namespace) -> None:
     for n, tensor in enumerate(reader.tensors, 1):
         prettydims = ', '.join('{0:5}'.format(d) for d in list(tensor.shape) + [1] * (4 - len(tensor.shape)))
         print(f'  {n:5}: {tensor.n_elements:10} | {prettydims} | {tensor.tensor_type.name:7} | {tensor.name}')  # noqa: NP100
+        
+        # Print first 8 rows with 16 elements each
+        if tensor.data is not None and len(tensor.data) > 0:
+            # Reshape data to 2D if possible for row-based printing
+            data = tensor.data
+            if len(tensor.shape) >= 2:
+                # For multi-dimensional tensors, reshape to (first_dim, -1)
+                first_dim = tensor.shape[0]
+                remaining = tensor.n_elements // first_dim
+                data = data.reshape(first_dim, remaining)
+            elif len(tensor.shape) == 1:
+                # For 1D tensors, create 2D view with 16 elements per row
+                data = data.reshape(-1, 16) if len(data) >= 16 else data.reshape(1, -1)
+            
+            # Determine number of rows to print (max 8)
+            n_rows = min(8, data.shape[0])
+            
+            for row_idx in range(n_rows):
+                row_data = data[row_idx]
+                # Get first 16 elements of the row
+                elements = row_data[:min(16, len(row_data))]
+                
+                # Format elements based on tensor type
+                formatted_elements = []
+                for elem in elements:
+                    if tensor.tensor_type.name in ('I8_S', 'I2_S', 'TL1', 'TL2'):
+                        # Quantized types - format as hex bytes
+                        formatted_elements.append(f'0x{int(elem):02x}')
+                    elif tensor.data.dtype in (np.float32, np.float64):
+                        # Float types
+                        formatted_elements.append(f'{float(elem):.6g}')
+                    elif tensor.data.dtype in (np.float16,):
+                        # Half precision
+                        formatted_elements.append(f'{float(elem):.4g}')
+                    else:
+                        # Integer types
+                        formatted_elements.append(f'{int(elem)}')
+                
+                row_str = '    [' + ', '.join(formatted_elements) + ']'
+                print(row_str)  # noqa: NP100
 
 
 def dump_metadata_json(reader: GGUFReader, args: argparse.Namespace) -> None:
