@@ -60,8 +60,8 @@ def dump_metadata(reader: GGUFReader, args: argparse.Namespace) -> None:
         prettydims = ', '.join('{0:5}'.format(d) for d in list(tensor.shape) + [1] * (4 - len(tensor.shape)))
         print(f'  {n:5}: {tensor.n_elements:10} | {prettydims} | {tensor.tensor_type.name:7} | {tensor.name}')  # noqa: NP100
         
-        # Print first 8 rows with 16 elements each
-        if tensor.data is not None and len(tensor.data) > 0:
+        # Print first 8 rows with 16 elements each (only in verbose mode)
+        if args.verbose and tensor.data is not None and len(tensor.data) > 0:
             try:
                 # For quantized tensors, data might not reshape to logical shape
                 # So we'll just print 16 elements per row of the raw data
