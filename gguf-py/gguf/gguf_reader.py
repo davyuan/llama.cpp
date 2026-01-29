@@ -63,6 +63,7 @@ class ReaderTensor(NamedTuple):
     data_offset: int
     data: npt.NDArray[Any]
     field: ReaderField
+    scale: float | None
 
 
 class GGUFReader:
@@ -306,6 +307,12 @@ class GGUFReader:
                 item_count = n_bytes
                 item_type = np.uint8
                 np_dims = quant_shape_to_byte_shape(np_dims, ggml_type)
+
+            scale = None
+            if ggml_type in (GGMLQuantizationType.I2_S, GGMLQuantizationType.TL1, GGMLQuantizationType.TL2):
+                # The scale is at data_offset + n_bytes as a float32
+                scale = self._get(data_offs + n_bytes, np.float32, 1)[0]
+
             tensors.append(ReaderTensor(
                 name = tensor_name,
                 tensor_type = ggml_type,
@@ -315,5 +322,6 @@ class GGUFReader:
                 data_offset = data_offs,
                 data = self._get(data_offs, item_type, item_count).reshape(np_dims),
                 field = field,
+                scale = scale,
             ))
         self.tensors = tensors

@@ -66,7 +66,6 @@ def dump_metadata(reader: GGUFReader, args: argparse.Namespace) -> None:
                 # For quantized tensors, data might not reshape to logical shape
                 # So we'll just print 16 elements per row of the raw data
                 data = tensor.data.flatten()
-                
                 # Print up to 8 rows of 16 elements each
                 max_elements = min(128, len(data))  # 8 rows * 16 elements
                 n_rows = (max_elements + 15) // 16  # Round up to get rows needed
