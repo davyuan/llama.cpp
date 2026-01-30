@@ -12652,11 +12652,12 @@ static void ggml_compute_forward_mul_mat(
     //   compute by src0 rows
 #if defined(GGML_BITNET_ARM_TL1)
     if (src0->type == GGML_TYPE_TL1) {
-        GGML_ASSERT(ggml_bitnet_can_mul_mat(src0, src1, dst));
-        GGML_ASSERT(sizeof(bitnet_float_type) == 4);
-        GGML_ASSERT(ggml_is_contiguous(src0));
-        GGML_ASSERT(ggml_is_contiguous(src1));
-        GGML_ASSERT(ggml_is_contiguous(dst));
+        if(!ggml_bitnet_can_mul_mat(src0, src1, dst) || sizeof(bitnet_float_type) != 4 ||
+           !ggml_is_contiguous(src0) || !ggml_is_contiguous(src1) || !ggml_is_contiguous(dst)) {
+            GGML_LOG_WARNING("BitNet TL1 matmul not possible, fallback to ggml gemm");
+            ggml_compute_forward_gemm(params, dst);
+            return;
+        }
 
         const int bits = ggml_bitnet_get_type_bits(type);
         // src0: weight,     ne00 = k, ne01 = m
