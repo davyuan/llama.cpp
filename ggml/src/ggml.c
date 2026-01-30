@@ -12654,8 +12654,7 @@ static void ggml_compute_forward_mul_mat(
     if (src0->type == GGML_TYPE_TL1) {
         if(!ggml_bitnet_can_mul_mat(src0, src1, dst) || sizeof(bitnet_float_type) != 4 ||
            !ggml_is_contiguous(src0) || !ggml_is_contiguous(src1) || !ggml_is_contiguous(dst)) {
-            GGML_LOG_WARNING("BitNet TL1 matmul not possible, fallback to ggml gemm");
-            ggml_compute_forward_gemm(params, dst);
+            fprintf(stderr, "BitNet TL1 matmul not possible, fallback to ggml gemm\n");
             return;
         }
 
