@@ -13136,9 +13136,16 @@ UseGgmlGemm1:;
                     if (src0->type == GGML_TYPE_I2_S) {
                         quantize_row_i8_s((float *)((char *) src1->data + i13*nb13 + i12*nb12 + i11*nb11), (void *) (wdata + i13*nbw3 + i12*nbw2 + i11*nbw1), ne10, act_scales + i11, act_sums + i11);
                     } else {
+#if defined(GGML_BITNET_ARM_TL1)
+                        GGML_ASSERT(src1->type == GGML_TYPE_F32 );
+                        memcpy((void *) (wdata + i13*nbw3 + i12*nbw2 + i11*nbw1),
+                               (void *)((char *) src1->data + i13*nb13 + i12*nb12 + i11*nb11),
+                               ne10 * sizeof(float));
+#else                        
                         from_float((float *)((char *) src1->data + i13*nb13 + i12*nb12 + i11*nb11),
                         (void *)               (wdata + i13*nbw3 + i12*nbw2 + i11*nbw1),
                         ne10);
+#endif
                     }
                 }
             }
@@ -13155,10 +13162,24 @@ UseGgmlGemm1:;
 #if GGML_USE_LLAMAFILE
     if (src1->type != vec_dot_type) {
         const void* wdata = (src1->type == vec_dot_type) ? src1->data : params->wdata;
-        const size_t row_size = ggml_row_size(vec_dot_type, ne10);
+        const size_t row_size = ggml_row_size(src1->type, ne10);
 
         for (int64_t i13 = 0; i13 < ne13; i13++)
             for (int64_t i12 = 0; i12 < ne12; i12++)
+#if defined(GGML_BITNET_ARM_TL1)
+                if (!llamafile_sgemm(ne01, ne11, ne00/ggml_blck_size(src0->type),
+                                     (const char *)src0->data + i12/r2*nb02 + i13/r3*nb03,
+                                     nb01/ggml_type_size(src0->type),
+                                     (const char *)wdata + (i12*ne11 + i13*ne12*ne11)*row_size,
+                                     row_size/ggml_type_size(src1->type),
+                                     (char *)dst->data + i12*nb2 + i13*nb3,
+                                     nb1/ggml_type_size(dst->type),
+                                     ith, nth,
+                                     src0->type,
+                                     src1->type,
+                                     dst->type))
+                    goto UseGgmlGemm2;
+#else                        
                 if (!llamafile_sgemm(ne01, ne11, ne00/ggml_blck_size(src0->type),
                                      (const char *)src0->data + i12/r2*nb02 + i13/r3*nb03,
                                      nb01/ggml_type_size(src0->type),
@@ -13171,6 +13192,7 @@ UseGgmlGemm1:;
                                      vec_dot_type,
                                      dst->type))
                     goto UseGgmlGemm2;
+#endif
         return;
     }
 UseGgmlGemm2:;
