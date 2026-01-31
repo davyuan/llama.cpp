@@ -12654,6 +12654,42 @@ static void ggml_compute_forward_mul_mat(
     if (src0->type == GGML_TYPE_F16 && src1->type == GGML_TYPE_F32) {
         const int64_t r2 = ne12/ne02;
         const int64_t r3 = ne13/ne03;
+
+        if (ne11 == 1) {
+            ggml_fp16_t * x_f16 = (ggml_fp16_t *) params->wdata;
+            for (int64_t i13 = 0; i13 < ne13; i13++) {
+                for (int64_t i12 = 0; i12 < ne12; i12++) {
+                    if (ith == 0) {
+                        ggml_fp32_to_fp16_row((const float *)((char *)src1->data + i12*nb12 + i13*nb13),
+                                              x_f16 + (i12 + i13*ne12)*ne10, ne10);
+                    }
+                }
+            }
+            ggml_barrier(params->threadpool);
+
+            for (int64_t i13 = 0; i13 < ne13; i13++) {
+                for (int64_t i12 = 0; i12 < ne12; i12++) {
+                    const int64_t i03 = i13 / r3;
+                    const int64_t i02 = i12 / r2;
+
+                    const ggml_fp16_t * x_vec = x_f16 + (i12 + i13*ne12)*ne10;
+                    const char * A = (const char *)src0->data + i02*nb02 + i03*nb03;
+                    float * y = (float *)((char *)dst->data + i12*nb2 + i13*nb3);
+
+                    const int64_t m = ne01;
+                    const int64_t rows_per_thread = (m + nth - 1) / nth;
+                    const int64_t r_start = ith * rows_per_thread;
+                    const int64_t r_end = MIN(r_start + rows_per_thread, m);
+
+                    for (int64_t i = r_start; i < r_end; i++) {
+                        ggml_vec_dot_f16(ne00, &y[i], 0, (ggml_fp16_t *)(A + i*nb01), 0, (ggml_fp16_t *)x_vec, 0, 1);
+                    }
+                }
+            }
+            ggml_barrier(params->threadpool);
+            return;
+        }
+
         for (int64_t i13 = 0; i13 < ne13; i13++) {
             for (int64_t i12 = 0; i12 < ne12; i12++) {
                 if (!llamafile_sgemm(ne01, ne11, ne00,
@@ -12671,6 +12707,7 @@ static void ggml_compute_forward_mul_mat(
                 }
             }
         }
+        ggml_barrier(params->threadpool);
         return;
 UseGgmlGemm_TL1:;
     }
