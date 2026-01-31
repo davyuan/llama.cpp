@@ -12728,6 +12728,18 @@ UseGgmlVec_Dot_TL1:
             return;
         }
 
+        if (ith == 0 && (strcmp(src1->name, "blk.0.attn_q.weight") == 0 || strcmp(src1->name, "blk.0.attn_k.weight") == 0)) {
+            printf("DEBUG: src0 dump for %s\n", src1->name);
+            const uint8_t * data = (const uint8_t *)src0->data;
+            for (int r = 0; r < 16 && r < ne01; r++) {
+                printf("row %2d: ", (int)r);
+                for (int c = 0; c < 16; c++) {
+                    printf("%02x ", data[r * (ne01 / 2) + c]);
+                }
+                printf("\n");
+            }
+        }
+
         const int bits = ggml_bitnet_get_type_bits(type);
         // src0: weight,     ne00 = k, ne01 = m
         // src1: activation, ne10 = k, ne11 = n
