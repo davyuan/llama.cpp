@@ -72,10 +72,10 @@ def dump_metadata(reader: GGUFReader, args: argparse.Namespace) -> None:
                 
                 for row_idx in range(n_rows):
                     if tensor.tensor_type.name == 'TL1':
-                        start_idx = row_idx * tensor.shape[0] //2 #tensor is saved transposed in TL1
+                        start_idx = row_idx * tensor.shape[1] //2 #tensor is saved transposed in TL1
                         end_idx = min(start_idx + tensor.shape[0] //2, max_elements)
                     else:
-                        start_idx = row_idx * tensor.shape[1]
+                        start_idx = row_idx * tensor.shape[0]
                         end_idx = min(start_idx + 16, max_elements)
                     elements = data[start_idx:end_idx]
                     
