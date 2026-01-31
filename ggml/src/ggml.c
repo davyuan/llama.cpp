@@ -12677,24 +12677,13 @@ static void ggml_compute_forward_mul_mat(
 
 UseGgmlVec_Dot_TL1:        
         if (ne11 == 1) {
-            ggml_fp16_t * x_f16 = (ggml_fp16_t *) params->wdata;
-            for (int64_t i13 = 0; i13 < ne13; i13++) {
-                for (int64_t i12 = 0; i12 < ne12; i12++) {
-                    if (ith == 0) {
-                        ggml_fp32_to_fp16_row((const float *)((char *)src1->data + i12*nb12 + i13*nb13),
-                                              x_f16 + (i12 + i13*ne12)*ne10, ne10);
-                    }
-                }
-            }
-            ggml_barrier(params->threadpool);
-
             for (int64_t i13 = 0; i13 < ne13; i13++) {
                 for (int64_t i12 = 0; i12 < ne12; i12++) {
                     const int64_t i03 = i13 / r3;
                     const int64_t i02 = i12 / r2;
 
-                    const ggml_fp16_t * x_vec = x_f16 + (i12 + i13*ne12)*ne10;
                     const char * A = (const char *)src0->data + i02*nb02 + i03*nb03;
+                    const float * x = (const float *)((char *)src1->data + i12*nb12 + i13*nb13);
                     float * y = (float *)((char *)dst->data + i12*nb2 + i13*nb3);
 
                     const int64_t m = ne01;
@@ -12703,7 +12692,27 @@ UseGgmlVec_Dot_TL1:
                     const int64_t r_end = MIN(r_start + rows_per_thread, m);
 
                     for (int64_t i = r_start; i < r_end; i++) {
-                        ggml_vec_dot_f16(ne00, &y[i], 0, (ggml_fp16_t *)(A + i*nb01), 0, (ggml_fp16_t *)x_vec, 0, 1);
+                        float sum = 0.0f;
+                        const ggml_fp16_t * w = (const ggml_fp16_t *)(A + i*nb01);
+                        int64_t k = 0;
+#if defined(__ARM_NEON)
+                        float32x4_t vsum = vdupq_n_f32(0.0f);
+                        for (; k <= ne00 - 4; k += 4) {
+                            float32x4_t vw = {
+                                GGML_FP16_TO_FP32(w[k+0]),
+                                GGML_FP16_TO_FP32(w[k+1]),
+                                GGML_FP16_TO_FP32(w[k+2]),
+                                GGML_FP16_TO_FP32(w[k+3])
+                            };
+                            float32x4_t vx = vld1q_f32(x + k);
+                            vsum = vfmaq_f32(vsum, vw, vx);
+                        }
+                        sum = vaddvq_f32(vsum);
+#endif
+                        for (; k < ne00; k++) {
+                            sum += GGML_FP16_TO_FP32(w[k]) * x[k];
+                        }
+                        y[i] = sum;
                     }
                 }
             }
