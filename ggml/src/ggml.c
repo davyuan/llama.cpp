@@ -12655,6 +12655,27 @@ static void ggml_compute_forward_mul_mat(
         const int64_t r2 = ne12/ne02;
         const int64_t r3 = ne13/ne03;
 
+        for (int64_t i13 = 0; i13 < ne13; i13++) {
+            for (int64_t i12 = 0; i12 < ne12; i12++) {
+                if (!llamafile_sgemm(ne01, ne11, ne00,
+                                     (const char *)src0->data + i12/r2*nb02 + i13/r3*nb03,
+                                     nb01/ggml_type_size(src0->type),
+                                     (const char *)src1->data + i12*nb12 + i13*nb13,
+                                     nb11/ggml_type_size(src1->type),
+                                     (char *)dst->data + i12*nb2 + i13*nb3,
+                                     nb1/ggml_type_size(dst->type),
+                                     ith, nth,
+                                     src0->type,
+                                     src1->type,
+                                     dst->type)) {
+                    goto UseGgmlVec_Dot_TL1;
+                }
+            }
+        }
+        ggml_barrier(params->threadpool);
+        return;
+
+UseGgmlVec_Dot_TL1:        
         if (ne11 == 1) {
             ggml_fp16_t * x_f16 = (ggml_fp16_t *) params->wdata;
             for (int64_t i13 = 0; i13 < ne13; i13++) {
@@ -12689,27 +12710,6 @@ static void ggml_compute_forward_mul_mat(
             ggml_barrier(params->threadpool);
             return;
         }
-
-        for (int64_t i13 = 0; i13 < ne13; i13++) {
-            for (int64_t i12 = 0; i12 < ne12; i12++) {
-                if (!llamafile_sgemm(ne01, ne11, ne00,
-                                     (const char *)src0->data + i12/r2*nb02 + i13/r3*nb03,
-                                     nb01/ggml_type_size(src0->type),
-                                     (const char *)src1->data + i12*nb12 + i13*nb13,
-                                     nb11/ggml_type_size(src1->type),
-                                     (char *)dst->data + i12*nb2 + i13*nb3,
-                                     nb1/ggml_type_size(dst->type),
-                                     ith, nth,
-                                     src0->type,
-                                     src1->type,
-                                     dst->type)) {
-                    goto UseGgmlGemm_TL1;
-                }
-            }
-        }
-        ggml_barrier(params->threadpool);
-        return;
-UseGgmlGemm_TL1:;
     }
 
     if (src0->type == GGML_TYPE_TL1) {
