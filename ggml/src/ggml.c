@@ -13111,7 +13111,11 @@ UseGgmlGemm1:;
     if (src1->type != vec_dot_type) {
         char * wdata = params->wdata;
 
+#if defined(GGML_BITNET_ARM_TL1)
+        const size_t nbw1 = ggml_row_size(src1->type, ne10);
+#else
         const size_t nbw1 = ggml_row_size(vec_dot_type, ne10);
+#endif
         const size_t nbw2 = nbw1*ne11;
         const size_t nbw3 = nbw2*ne12;
 
