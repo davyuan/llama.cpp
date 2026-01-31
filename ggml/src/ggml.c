@@ -12728,8 +12728,8 @@ UseGgmlVec_Dot_TL1:
             return;
         }
 
-        if (ith == 0 && (strcmp(src1->name, "blk.0.attn_q.weight") == 0 || strcmp(src1->name, "blk.0.attn_k.weight") == 0)) {
-            printf("DEBUG: src0 dump for %s\n", src1->name);
+        if (ith == 0 && (strcmp(src0->name, "blk.0.attn_q.weight") == 0 || strcmp(src0->name, "blk.0.attn_k.weight") == 0)) {
+            printf("DEBUG: src0 dump for %s\n", src0->name);
             const uint8_t * data = (const uint8_t *)src0->data;
             for (int r = 0; r < 16 && r < ne01; r++) {
                 printf("row %2d: ", (int)r);
