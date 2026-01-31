@@ -13176,7 +13176,11 @@ UseGgmlGemm1:;
 #if GGML_USE_LLAMAFILE
     if (src1->type != vec_dot_type) {
         const void* wdata = (src1->type == vec_dot_type) ? src1->data : params->wdata;
-        const size_t row_size = nbw1;
+#if defined(GGML_BITNET_ARM_TL1)
+        const size_t row_size = ggml_row_size(src1->type, ne10);
+#else
+        const size_t row_size = ggml_row_size(vec_dot_type, ne10);
+#endif
 
         for (int64_t i13 = 0; i13 < ne13; i13++)
             for (int64_t i12 = 0; i12 < ne12; i12++)
