@@ -13122,13 +13122,17 @@ UseGgmlGemm1:;
         assert(params->wsize >= ne13*nbw3);
         GGML_ASSERT(src1->type == GGML_TYPE_F32);
 
-        float* act_scales = (float*) ((char *) wdata + (ne11 * ne10));
+        float* act_scales = (float*) ((char *) wdata + ne13*nbw3);
         int32_t* act_sums = (int32_t*) ((char *) act_scales + (ne11) * sizeof(float));
 
         for (int64_t i13 = 0; i13 < ne13; ++i13) {
             for (int64_t i12 = 0; i12 < ne12; ++i12) {
                 int64_t i11_processed = 0;
-                if ((ggml_n_dims(src1) == 2) && from_float_to_mat && gemm) {
+                if ((ggml_n_dims(src1) == 2) && from_float_to_mat && gemm
+#if defined(GGML_BITNET_ARM_TL1)
+                    && false
+#endif
+                ) {
                     for (int64_t i11 = ith * 4; i11 < ne11 - ne11 % 4; i11 += nth * 4) {
                         from_float_to_mat((float *)((char *) src1->data + i13*nb13 + i12*nb12 + i11*nb11),
                                           (void *)               (wdata + i13*nbw3 + i12*nbw2 + i11*nbw1),
@@ -13138,7 +13142,13 @@ UseGgmlGemm1:;
                 }
                 for (int64_t i11 = i11_processed + ith; i11 < ne11; i11 += nth) {
                     if (src0->type == GGML_TYPE_I2_S) {
+#if defined(GGML_BITNET_ARM_TL1)
+                        memcpy((void *) (wdata + i13*nbw3 + i12*nbw2 + i11*nbw1),
+                               (void *)((char *) src1->data + i13*nb13 + i12*nb12 + i11*nb11),
+                               ne10 * sizeof(float));
+#else
                         quantize_row_i8_s((float *)((char *) src1->data + i13*nb13 + i12*nb12 + i11*nb11), (void *) (wdata + i13*nbw3 + i12*nbw2 + i11*nbw1), ne10, act_scales + i11, act_sums + i11);
+#endif
                     } else {
 #if defined(GGML_BITNET_ARM_TL1)
                         GGML_ASSERT(src1->type == GGML_TYPE_F32 );
@@ -13166,7 +13176,7 @@ UseGgmlGemm1:;
 #if GGML_USE_LLAMAFILE
     if (src1->type != vec_dot_type) {
         const void* wdata = (src1->type == vec_dot_type) ? src1->data : params->wdata;
-        const size_t row_size = ggml_row_size(src1->type, ne10);
+        const size_t row_size = nbw1;
 
         for (int64_t i13 = 0; i13 < ne13; i13++)
             for (int64_t i12 = 0; i12 < ne12; i12++)
