@@ -12728,18 +12728,6 @@ UseGgmlVec_Dot_TL1:
             return;
         }
 
-        if (ith == 0 && (strcmp(src0->name, "blk.0.attn_q.weight") == 0 || strcmp(src0->name, "blk.0.attn_k.weight") == 0)) {
-            printf("DEBUG: src0 dump for %s\n", src0->name);
-            const uint8_t * data = (const uint8_t *)src0->data;
-            for (int r = 0; r < 16 && r < ne01; r++) {
-                printf("row %2d: ", (int)r);
-                for (int c = 0; c < 16; c++) {
-                    printf("%02x ", data[r * (ne01 / 2) + c]);
-                }
-                printf("\n");
-            }
-        }
-
         const int bits = ggml_bitnet_get_type_bits(type);
         // src0: weight,     ne00 = k, ne01 = m
         // src1: activation, ne10 = k, ne11 = n
@@ -12787,8 +12775,13 @@ UseGgmlVec_Dot_TL1:
                 act_output = dst->data;
             }
 
-            const int range_per_thread_ii = ne01 / nth;
-            for (int ii = ith * range_per_thread_ii; ii < (ith + 1) * range_per_thread_ii; ii += BM) {          
+            const int n_tiles = (ne01 + BM - 1) / BM;
+            const int tiles_per_thread = (n_tiles + nth - 1) / nth;
+            const int tile_start = ith * tiles_per_thread;
+            const int tile_end = MIN(tile_start + tiles_per_thread, n_tiles);
+
+            for (int tile = tile_start; tile < tile_end; tile++) {
+                const int ii = tile * BM;
                 ggml_qgemm_lut( ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
                                 QLUT, 
                                 &(wt->scales[0]), 
