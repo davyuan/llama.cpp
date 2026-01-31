@@ -12651,6 +12651,30 @@ static void ggml_compute_forward_mul_mat(
     // nb01 >= nb00 - src0 is not transposed
     //   compute by src0 rows
 #if defined(GGML_BITNET_ARM_TL1)
+    if (src0->type == GGML_TYPE_F16 && src1->type == GGML_TYPE_F32) {
+        const int64_t r2 = ne12/ne02;
+        const int64_t r3 = ne13/ne03;
+        for (int64_t i13 = 0; i13 < ne13; i13++) {
+            for (int64_t i12 = 0; i12 < ne12; i12++) {
+                if (!llamafile_sgemm(ne01, ne11, ne00,
+                                     (const char *)src0->data + i12/r2*nb02 + i13/r3*nb03,
+                                     nb01/ggml_type_size(src0->type),
+                                     (const char *)src1->data + i12*nb12 + i13*nb13,
+                                     nb11/ggml_type_size(src1->type),
+                                     (char *)dst->data + i12*nb2 + i13*nb3,
+                                     nb1/ggml_type_size(dst->type),
+                                     ith, nth,
+                                     src0->type,
+                                     src1->type,
+                                     dst->type)) {
+                    goto UseGgmlGemm_TL1;
+                }
+            }
+        }
+        return;
+UseGgmlGemm_TL1:;
+    }
+
     if (src0->type == GGML_TYPE_TL1) {
         if(!ggml_bitnet_can_mul_mat(src0, src1, dst) || sizeof(bitnet_float_type) != 4 ||
            !ggml_is_contiguous(src0) || !ggml_is_contiguous(src1) || !ggml_is_contiguous(dst)) {
