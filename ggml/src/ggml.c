@@ -12712,12 +12712,10 @@ UseGgmlVec_Dot_TL1:
         };
         int8_t * qlut = (int8_t *)cur_wdata;
         int qlut_size_per_ne10 = 16 * ne10 * sizeof(int8_t);
-        bitnet_float_type * lut_scales = (bitnet_float_type *) (qlut + 2 * qlut_size_per_ne10);
+        bitnet_float_type * lut_scales = (bitnet_float_type *) (qlut + ne11 * qlut_size_per_ne10);
         bitnet_float_type * lut_biases = (bitnet_float_type *) (lut_scales + wt->lut_scales_size * ne11);
         bitnet_float_type * act_input = (bitnet_float_type *)src1->data;
-        const int n_tiles = (ne01 + BM - 1) / BM;
-        const int tile_start = (n_tiles * ith) / nth;
-        const int tile_end = (n_tiles * (ith + 1)) / nth;
+        struct bitnet_tensor_extra * wt = (struct bitnet_tensor_extra *)src0->extra;
 
         bitnet_float_type * act_output;
         if (sizeof(bitnet_float_type) == 2) {
@@ -12727,47 +12725,40 @@ UseGgmlVec_Dot_TL1:
         }
         
         if (ith == 0) {
-            memset(dst->data, 0, ggml_nbytes(dst));
-            struct bitnet_tensor_extra * wt = (struct bitnet_tensor_extra *)src0->extra;
+            ggml_set_zero(dst);
             ggml_bitnet_transform_tensor(src0);
         }
         ggml_barrier(params->threadpool);
 
-        for(int j = 0; j < ne11 - 1; j+=2) {
-            if (ith == 0) {
-                // use wdata-based qlut/lut_scales for better safety
-                ggml_preprocessor(ne01, ne10, act_input + (j * ne10), &lut_scales[0], qlut);
-                ggml_preprocessor(ne01, ne10, act_input + ((j + 1) * ne10), &lut_scales[1], qlut + qlut_size_per_ne10);
-            }
-            ggml_barrier(params->threadpool);
+        //paritiion work among threads along j-loop
+        const int tile_num = (ne11 + nth - 1) / nth;
+        const int j_start = ith * tile_num;;
+        const int j_end = MIN((ith + 1) * tile_num, ne11);
+        for(int j = j_start; j < j_end - 1; j+=2) {
+            // use wdata-based qlut/lut_scales for better safety
+            ggml_preprocessor(ne01, ne10, act_input + (j * ne10), &lut_scales[j], qlut + j * qlut_size_per_ne10);
+            ggml_preprocessor(ne01, ne10, act_input + ((j + 1) * ne10), &lut_scales[j + 1], qlut + (j + 1) * qlut_size_per_ne10);
 
-            for (int tile = tile_start; tile < tile_end; tile++) {
-                const int ii = tile * BM;
+            for (int ii = 0; ii < ne01; ii+= BM) {
                 ggml_qgemm_lut_2col( ne01, ne11, ne00, ii, j, ((uint8_t *)(src0->data)), 
-                                qlut,
-                                qlut + qlut_size_per_ne10, 
+                                qlut + j * qlut_size_per_ne10,
+                                qlut + (j + 1) * qlut_size_per_ne10, 
                                 &(wt->scales[0]), 
-                                lut_scales, 
+                                lut_scales + j, 
                                 act_output);
             }        
-            ggml_barrier(params->threadpool); 
         }
 
-        if(ne11 % 2 == 1) {
-            if (ith == 0) {
-                ggml_preprocessor(ne01, ne10, act_input + ((ne11 -1) * ne10), &lut_scales[0], qlut);
-            }
-            ggml_barrier(params->threadpool);
-            for (int tile = tile_start; tile < tile_end; tile++) {
-                const int ii = tile * BM;
+        if((j_end - j_start) % 2 == 1) {
+            ggml_preprocessor(ne01, ne10, act_input + ((j_end - 1) * ne10), &lut_scales[j_end - 1], qlut + (j_end - 1) * qlut_size_per_ne10);
+            for (int ii = 0; ii < ne01; ii+= BM) {
                 ggml_qgemm_lut( ne01, ne11, ne10, ii, (ne11 -1), ((uint8_t *)(src0->data)), 
-                                qlut, 
+                                qlut + (j_end - 1) * qlut_size_per_ne10, 
                                 &(wt->scales[0]), 
-                                lut_scales, 
+                                lut_scales + (j_end - 1), 
                                 act_output);
             } 
         }
-        ggml_barrier(params->threadpool);
         return;
     }
 #endif
