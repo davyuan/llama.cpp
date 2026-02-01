@@ -12715,7 +12715,6 @@ UseGgmlVec_Dot_TL1:
         bitnet_float_type * lut_scales = (bitnet_float_type *) (qlut + ne11 * qlut_size_per_ne10);
         bitnet_float_type * lut_biases = (bitnet_float_type *) (lut_scales + wt->lut_scales_size * ne11);
         bitnet_float_type * act_input = (bitnet_float_type *)src1->data;
-        struct bitnet_tensor_extra * wt = (struct bitnet_tensor_extra *)src0->extra;
 
         bitnet_float_type * act_output;
         if (sizeof(bitnet_float_type) == 2) {
