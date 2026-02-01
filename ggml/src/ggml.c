@@ -12710,8 +12710,8 @@ UseGgmlVec_Dot_TL1:
         if (sizeof(bitnet_float_type) == 2) {
             cur_wdata = wdata + MAX(ne10, ne00) * ne11 * sizeof(bitnet_float_type);
         };
-        int8_t * qlut = cur_wdata;
-        int8_t qlut_size_per_ne10 = 16 * ne10 * sizeof(int8_t);
+        int8_t * qlut = (int8_t *)cur_wdata;
+        int qlut_size_per_ne10 = 16 * ne10 * sizeof(int8_t);
         bitnet_float_type * lut_scales = (bitnet_float_type *) (qlut + 2 * qlut_size_per_ne10);
         bitnet_float_type * lut_biases = (bitnet_float_type *) (lut_scales + wt->lut_scales_size * ne11);
         bitnet_float_type * act_input = (bitnet_float_type *)src1->data;
