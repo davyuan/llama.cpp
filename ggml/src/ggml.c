@@ -12729,59 +12729,49 @@ UseGgmlVec_Dot_TL1:
         }
         ggml_barrier(params->threadpool);
 
+        // Grid partitioning that prioritizes thread affinity to specific LUTs (columns).
+        // This exactly matches the behavior of lut_micro_kernel in main.cpp.
         const int n_ii = (ne01 + BM - 1) / BM;
         const int n_j_units = (ne11 + 1) / 2;
-        
-        // Caching Strategy: Partition columns into blocks to keep LUTs in L2 (1MB limit).
-        // Each unit (2 cols) takes ~80KB for K=2560. 8 units = 640KB.
-        const int units_per_block = 8;
+        const int total_tasks = n_j_units * n_ii;
 
-        for (int b_start = 0; b_start < n_j_units; b_start += units_per_block) {
-            int b_end = MIN(b_start + units_per_block, n_j_units);
-            int cols_start = b_start * 2;
-            int cols_end   = MIN(b_end * 2, ne11);
+        const int t_per_th = (total_tasks + nth - 1) / nth;
+        const int t_start = ith * t_per_th;
+        const int t_end   = MIN((ith + 1) * t_per_th, total_tasks);
 
-            // Phase 1: Parallel Preprocessing for current block
-            const int n_cols_in_block = cols_end - cols_start;
-            const int j_p_t = (n_cols_in_block + nth - 1) / nth;
-            const int zp_start = cols_start + ith * j_p_t;
-            const int zp_end   = MIN(cols_start + (ith + 1) * j_p_t, cols_end);
-            for (int j = zp_start; j < zp_end; j++) {
-                ggml_preprocessor(ne01, ne10, act_input + (j * ne10), &lut_scales[j], qlut + j * qlut_size_per_ne10);
-            }
-            ggml_barrier(params->threadpool);
+        int last_u = -1;
+        for (int t = t_start; t < t_end; t++) {
+            int u_idx = t / n_ii;
+            int ii_idx = t % n_ii;
+            int j = u_idx * 2;
+            int ii = ii_idx * BM;
 
-            // Phase 2: Parallel Matmul for current block
-            // This ensures each thread finishes all row-blocks for a LUT before moving on.
-            int tasks_in_block = (b_end - b_start) * n_ii;
-            int t_p_t = (tasks_in_block + nth - 1) / nth;
-            int t_start = ith * t_p_t;
-            int t_end   = MIN((ith + 1) * t_p_t, tasks_in_block);
-
-            for (int t = t_start; t < t_end; t++) {
-                int rel_unit = t / n_ii;
-                int unit_idx = b_start + rel_unit;
-                int ii_idx   = t % n_ii;
-                int ii   = ii_idx * BM;
-                int j    = unit_idx * 2;
-
-                if (j + 1 < ne11) {
-                    ggml_qgemm_lut_2col(ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
-                                        qlut + j * qlut_size_per_ne10,
-                                        qlut + (j + 1) * qlut_size_per_ne10, 
-                                        &(wt->scales[0]), 
-                                        lut_scales + j, 
-                                        act_output);
-                } else {
-                    ggml_qgemm_lut(ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
-                                   qlut + j * qlut_size_per_ne10, 
-                                   &(wt->scales[0]), 
-                                   lut_scales + j, 
-                                   act_output);
+            // Just-In-Time Preprocessing: Build the LUT in the same thread that uses it.
+            // This ensures the LUT data is hot in the L1/L2 cache of the current core.
+            if (u_idx != last_u) {
+                if (j < ne11) {
+                    ggml_preprocessor(ne01, ne10, act_input + (j * ne10), &lut_scales[j], qlut + j * qlut_size_per_ne10);
                 }
+                if (j + 1 < ne11) {
+                    ggml_preprocessor(ne01, ne10, act_input + ((j + 1) * ne10), &lut_scales[j + 1], qlut + (j + 1) * qlut_size_per_ne10);
+                }
+                last_u = u_idx;
             }
-            // Barrier before next preprocessing block to avoid overwriting "hot" cache
-            ggml_barrier(params->threadpool);
+
+            if (j + 1 < ne11) {
+                ggml_qgemm_lut_2col(ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
+                                    qlut + j * qlut_size_per_ne10,
+                                    qlut + (j + 1) * qlut_size_per_ne10, 
+                                    &(wt->scales[0]), 
+                                    lut_scales + j, 
+                                    act_output);
+            } else {
+                ggml_qgemm_lut(ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
+                               qlut + j * qlut_size_per_ne10, 
+                               &(wt->scales[0]), 
+                               lut_scales + j, 
+                               act_output);
+            }
         }
         return;
     }
