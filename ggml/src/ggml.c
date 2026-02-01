@@ -12711,10 +12711,21 @@ UseGgmlVec_Dot_TL1:
             cur_wdata = wdata + MAX(ne10, ne00) * ne11 * sizeof(bitnet_float_type);
         };
         int8_t * qlut = cur_wdata;
-        bitnet_float_type * lut_scales = (bitnet_float_type *) (qlut + ne10 * ne11 * 16);
+        int8_t qlut_size_per_ne11 = 16 * ne11 * sizeof(int8_t);
+        bitnet_float_type * lut_scales = (bitnet_float_type *) (qlut + 2 * qlut_size_per_ne11);
         bitnet_float_type * lut_biases = (bitnet_float_type *) (lut_scales + wt->lut_scales_size * ne11);
         bitnet_float_type * act_input = (bitnet_float_type *)src1->data;
+        const int n_tiles = (ne01 + BM - 1) / BM;
+        const int tile_start = (n_tiles * ith) / nth;
+        const int tile_end = (n_tiles * (ith + 1)) / nth;
 
+        bitnet_float_type * act_output;
+        if (sizeof(bitnet_float_type) == 2) {
+            act_output = bitnet_f_ptr;
+        } else {
+            act_output = dst->data;
+        }
+        
         if (ith == 0) {
             memset(dst->data, 0, ggml_nbytes(dst));
             struct bitnet_tensor_extra * wt = (struct bitnet_tensor_extra *)src0->extra;
@@ -12722,28 +12733,19 @@ UseGgmlVec_Dot_TL1:
         }
         ggml_barrier(params->threadpool);
 
-        for(int j = 0; j < ne11; j++) {
+        for(int j = 0; j < ne11 - 1; j+2) {
             if (ith == 0) {
                 // use wdata-based qlut/lut_scales for better safety
-                ggml_preprocessor(ne01, ne00, act_input + (j * ne10), lut_scales, qlut);
+                ggml_preprocessor(ne01, ne00, act_input + (j * ne10), &lut_scales[0], qlut);
+                ggml_preprocessor(ne01, ne00, act_input + ((j + 1) * ne10), &lut_scales[1], qlut + qlut_size_per_ne11);
             }
             ggml_barrier(params->threadpool);
 
-            bitnet_float_type * act_output;
-            if (sizeof(bitnet_float_type) == 2) {
-                act_output = bitnet_f_ptr;
-            } else {
-                act_output = dst->data;
-            }
-
-            const int n_tiles = (ne01 + BM - 1) / BM;
-            const int tile_start = (n_tiles * ith) / nth;
-            const int tile_end = (n_tiles * (ith + 1)) / nth;
-
             for (int tile = tile_start; tile < tile_end; tile++) {
                 const int ii = tile * BM;
-                ggml_qgemm_lut( ne01, ne11, ne00, ii, j, ((uint8_t *)(src0->data)), 
-                                qlut, 
+                ggml_qgemm_lut_2col( ne01, ne11, ne00, ii, j, ((uint8_t *)(src0->data)), 
+                                qlut,
+                                qlut + qlut_size_per_ne11, 
                                 &(wt->scales[0]), 
                                 lut_scales, 
                                 act_output);
@@ -12751,6 +12753,21 @@ UseGgmlVec_Dot_TL1:
             ggml_barrier(params->threadpool); 
         }
 
+        if(ne11 % 2 == 1) {
+            if (ith == 0) {
+                ggml_preprocessor(ne01, ne00, B + ((ne11 -1) * ne10), &lut_scales[0], qlut);
+            }
+#pragma omp barrier
+            for (int tile = tile_start; tile < tile_end; tile++) {
+                const int ii = tile * BM;
+                ggml_qgemm_lut( ne01, ne11, ne10, ii, (ne11 -1), ((uint8_t *)(src0->data)), 
+                                qlut, 
+                                &(wt->scales[0]), 
+                                lut_scales, 
+                                act_output);
+            } 
+        }
+#pragma omp barrier        
         return;
     }
 #endif
