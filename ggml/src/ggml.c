@@ -12755,7 +12755,7 @@ UseGgmlVec_Dot_TL1:
 
         if(ne11 % 2 == 1) {
             if (ith == 0) {
-                ggml_preprocessor(ne01, ne00, B + ((ne11 -1) * ne10), &lut_scales[0], qlut);
+                ggml_preprocessor(ne01, ne00, act_input + ((ne11 -1) * ne10), &lut_scales[0], qlut);
             }
 #pragma omp barrier
             for (int tile = tile_start; tile < tile_end; tile++) {
