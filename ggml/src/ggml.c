@@ -12736,8 +12736,8 @@ UseGgmlVec_Dot_TL1:
         for(int j = 0; j < ne11 - 1; j+=2) {
             if (ith == 0) {
                 // use wdata-based qlut/lut_scales for better safety
-                ggml_preprocessor(ne01, ne00, act_input + (j * ne10), &lut_scales[0], qlut);
-                ggml_preprocessor(ne01, ne00, act_input + ((j + 1) * ne10), &lut_scales[1], qlut + qlut_size_per_ne10);
+                ggml_preprocessor(ne01, ne01, act_input + (j * ne10), &lut_scales[0], qlut);
+                ggml_preprocessor(ne01, ne01, act_input + ((j + 1) * ne10), &lut_scales[1], qlut + qlut_size_per_ne10);
             }
             ggml_barrier(params->threadpool);
 
@@ -12757,7 +12757,7 @@ UseGgmlVec_Dot_TL1:
             if (ith == 0) {
                 ggml_preprocessor(ne01, ne00, act_input + ((ne11 -1) * ne10), &lut_scales[0], qlut);
             }
-#pragma omp barrier
+            ggml_barrier(params->threadpool);
             for (int tile = tile_start; tile < tile_end; tile++) {
                 const int ii = tile * BM;
                 ggml_qgemm_lut( ne01, ne11, ne10, ii, (ne11 -1), ((uint8_t *)(src0->data)), 
@@ -12767,7 +12767,7 @@ UseGgmlVec_Dot_TL1:
                                 act_output);
             } 
         }
-#pragma omp barrier        
+        ggml_barrier(params->threadpool);
         return;
     }
 #endif
