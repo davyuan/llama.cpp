@@ -12729,34 +12729,45 @@ UseGgmlVec_Dot_TL1:
         }
         ggml_barrier(params->threadpool);
 
-        //paritiion work among threads along j-loop
-        const int tile_num = (ne11 + nth - 1) / nth;
-        const int j_start = ith * tile_num;;
-        const int j_end = MIN((ith + 1) * tile_num, ne11);
-        for(int j = j_start; j < j_end - 1; j+=2) {
-            // use wdata-based qlut/lut_scales for better safety
+        // 1. Parallel Preprocessing: Every core helps build LUTs for its assigned columns
+        const int j_per_thread = (ne11 + nth - 1) / nth;
+        const int zp_start = ith * j_per_thread;
+        const int zp_end   = MIN((ith + 1) * j_per_thread, ne11);
+        for (int j = zp_start; j < zp_end; j++) {
             ggml_preprocessor(ne01, ne10, act_input + (j * ne10), &lut_scales[j], qlut + j * qlut_size_per_ne10);
-            ggml_preprocessor(ne01, ne10, act_input + ((j + 1) * ne10), &lut_scales[j + 1], qlut + (j + 1) * qlut_size_per_ne10);
-
-            for (int ii = 0; ii < ne01; ii+= BM) {
-                ggml_qgemm_lut_2col( ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
-                                qlut + j * qlut_size_per_ne10,
-                                qlut + (j + 1) * qlut_size_per_ne10, 
-                                &(wt->scales[0]), 
-                                lut_scales + j, 
-                                act_output);
-            }        
         }
+        ggml_barrier(params->threadpool); // Ensure all LUTs are ready for the matmul phase
 
-        if((j_end - j_start) % 2 == 1) {
-            ggml_preprocessor(ne01, ne10, act_input + ((j_end - 1) * ne10), &lut_scales[j_end - 1], qlut + (j_end - 1) * qlut_size_per_ne10);
-            for (int ii = 0; ii < ne01; ii+= BM) {
-                ggml_qgemm_lut( ne01, ne11, ne10, ii, (j_end - 1), ((uint8_t *)(src0->data)), 
-                                qlut + (j_end - 1) * qlut_size_per_ne10, 
-                                &(wt->scales[0]), 
-                                lut_scales + (j_end - 1), 
-                                act_output);
-            } 
+        // 2. Parallel Matmul: Distribute (j, ii) tasks across all cores
+        // This ensures 100% core utilization even during single-column decoding (N=1)
+        const int n_ii = (ne01 + BM - 1) / BM;
+        const int n_j_pairs = ne11 / 2;
+        const int n_j_rem = ne11 % 2;
+        const int total_tasks = (n_j_pairs + n_j_rem) * n_ii;
+
+        for (int t = ith; t < total_tasks; t += nth) {
+            int unit_idx = t / n_ii;
+            int ii_idx   = t % n_ii;
+            int ii = ii_idx * BM;
+
+            if (unit_idx < n_j_pairs) {
+                // Process 2 columns together for better throughput
+                int j = unit_idx * 2;
+                ggml_qgemm_lut_2col(ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
+                                    qlut + j * qlut_size_per_ne10,
+                                    qlut + (j + 1) * qlut_size_per_ne10, 
+                                    &(wt->scales[0]), 
+                                    lut_scales + j, 
+                                    act_output);
+            } else {
+                // Process the remainder column
+                int j = ne11 - 1;
+                ggml_qgemm_lut(ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
+                               qlut + j * qlut_size_per_ne10, 
+                               &(wt->scales[0]), 
+                               lut_scales + j, 
+                               act_output);
+            }
         }
         return;
     }
