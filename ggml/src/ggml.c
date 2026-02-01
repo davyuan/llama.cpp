@@ -12736,8 +12736,8 @@ UseGgmlVec_Dot_TL1:
         for(int j = 0; j < ne11 - 1; j+=2) {
             if (ith == 0) {
                 // use wdata-based qlut/lut_scales for better safety
-                ggml_preprocessor(ne01, ne01, act_input + (j * ne10), &lut_scales[0], qlut);
-                ggml_preprocessor(ne01, ne01, act_input + ((j + 1) * ne10), &lut_scales[1], qlut + qlut_size_per_ne10);
+                ggml_preprocessor(ne01, ne10, act_input + (j * ne10), &lut_scales[0], qlut);
+                ggml_preprocessor(ne01, ne10, act_input + ((j + 1) * ne10), &lut_scales[1], qlut + qlut_size_per_ne10);
             }
             ggml_barrier(params->threadpool);
 
@@ -12755,7 +12755,7 @@ UseGgmlVec_Dot_TL1:
 
         if(ne11 % 2 == 1) {
             if (ith == 0) {
-                ggml_preprocessor(ne01, ne00, act_input + ((ne11 -1) * ne10), &lut_scales[0], qlut);
+                ggml_preprocessor(ne01, ne10, act_input + ((ne11 -1) * ne10), &lut_scales[0], qlut);
             }
             ggml_barrier(params->threadpool);
             for (int tile = tile_start; tile < tile_end; tile++) {
