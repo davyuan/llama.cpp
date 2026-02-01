@@ -12776,9 +12776,8 @@ UseGgmlVec_Dot_TL1:
             }
 
             const int n_tiles = (ne01 + BM - 1) / BM;
-            const int tiles_per_thread = (n_tiles + nth - 1) / nth;
-            const int tile_start = ith * tiles_per_thread;
-            const int tile_end = MIN(tile_start + tiles_per_thread, n_tiles);
+            const int tile_start = (n_tiles * ith) / nth;
+            const int tile_end = (n_tiles * (ith + 1)) / nth;
 
             for (int tile = tile_start; tile < tile_end; tile++) {
                 const int ii = tile * BM;
