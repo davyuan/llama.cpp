@@ -12736,23 +12736,28 @@ UseGgmlVec_Dot_TL1:
         for (int j = zp_start; j < zp_end; j++) {
             ggml_preprocessor(ne01, ne10, act_input + (j * ne10), &lut_scales[j], qlut + j * qlut_size_per_ne10);
         }
-        ggml_barrier(params->threadpool); // Ensure all LUTs are ready for the matmul phase
+        ggml_barrier(params->threadpool);
 
-        // 2. Parallel Matmul: Distribute (j, ii) tasks across all cores
-        // This ensures 100% core utilization even during single-column decoding (N=1)
+        // 2. Parallel Matmul: Block-contiguous distribution for optimal cache locality
+        // We partition the (j_unit, ii) grid into contiguous chunks.
+        // This ensures each thread processes a sequential range of rows for a given column-pair,
+        // maximizing L1/L2 cache hits for both the weights and the activation LUTs.
         const int n_ii = (ne01 + BM - 1) / BM;
-        const int n_j_pairs = ne11 / 2;
-        const int n_j_rem = ne11 % 2;
-        const int total_tasks = (n_j_pairs + n_j_rem) * n_ii;
+        const int n_j_units = (ne11 + 1) / 2;
+        const int total_tasks = n_j_units * n_ii;
 
-        for (int t = ith; t < total_tasks; t += nth) {
+        const int tasks_per_thread = (total_tasks + nth - 1) / nth;
+        const int t_start = ith * tasks_per_thread;
+        const int t_end   = MIN((ith + 1) * tasks_per_thread, total_tasks);
+
+        for (int t = t_start; t < t_end; t++) {
             int unit_idx = t / n_ii;
             int ii_idx   = t % n_ii;
             int ii = ii_idx * BM;
+            int j  = unit_idx * 2;
 
-            if (unit_idx < n_j_pairs) {
-                // Process 2 columns together for better throughput
-                int j = unit_idx * 2;
+            if (j + 1 < ne11) {
+                // Process 2 columns together (reuses weights for high throughput)
                 ggml_qgemm_lut_2col(ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
                                     qlut + j * qlut_size_per_ne10,
                                     qlut + (j + 1) * qlut_size_per_ne10, 
@@ -12760,8 +12765,7 @@ UseGgmlVec_Dot_TL1:
                                     lut_scales + j, 
                                     act_output);
             } else {
-                // Process the remainder column
-                int j = ne11 - 1;
+                // Process single remainder column
                 ggml_qgemm_lut(ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
                                qlut + j * qlut_size_per_ne10, 
                                &(wt->scales[0]), 
