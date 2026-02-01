@@ -738,12 +738,12 @@ static void ggml_vec_dot_bf16(int n, float * restrict s, size_t bs, ggml_bf16_t 
 static const struct ggml_type_traits type_traits[GGML_TYPE_COUNT] = {
     [GGML_TYPE_TL1] = {
         .type_name                = "tl1",
-        .blck_size                = 4,
+        .blck_size                = 1,
         .type_size                = sizeof(int8_t),
-        .is_quantized             = false,
+        .is_quantized             = true,
         .vec_dot                  = (ggml_vec_dot_t) ggml_vec_dot_tl1,
         .vec_dot_type             = GGML_TYPE_F32,
-        .nrows                    = BM,
+        .nrows                    = 1,
     },
     [GGML_TYPE_TL2] = {
         .type_name                = "tl2",
@@ -12723,7 +12723,8 @@ UseGgmlVec_Dot_TL1:
 
     if (src0->type == GGML_TYPE_TL1) {
         if(!ggml_bitnet_can_mul_mat(src0, src1, dst) || sizeof(bitnet_float_type) != 4 ||
-           !ggml_is_contiguous(src0) || !ggml_is_contiguous(src1) || !ggml_is_contiguous(dst)) {
+           !ggml_is_contiguous(src0) || !ggml_is_contiguous(src1) || !ggml_is_contiguous(dst) ||
+           src1->type != GGML_TYPE_F32 || dst->type != GGML_TYPE_F32) {
             fprintf(stderr, "BitNet TL1 matmul not possible, fallback to ggml gemm\n");
             return;
         }
@@ -12742,29 +12743,19 @@ UseGgmlVec_Dot_TL1:
         int8_t * qlut = cur_wdata;
         bitnet_float_type * lut_scales = (bitnet_float_type *) (qlut + ne10 * ne11 * 16);
         bitnet_float_type * lut_biases = (bitnet_float_type *) (lut_scales + wt->lut_scales_size * ne11);
-
-        static int8_t* QLUT = NULL;
-        static bitnet_float_type* LUT_Scales = NULL;
+        bitnet_float_type * act_input = (bitnet_float_type *)src1->data;
 
         if (ith == 0) {
-            QLUT = (int8_t*)GGML_ALIGNED_MALLOC(ne10 * 16 * sizeof(int8_t));
-            LUT_Scales = (bitnet_float_type*)GGML_ALIGNED_MALLOC(sizeof(bitnet_float_type));
+            memset(dst->data, 0, ggml_nbytes(dst));
+            struct bitnet_tensor_extra * wt = (struct bitnet_tensor_extra *)src0->extra;
+            ggml_bitnet_transform_tensor(src0);
         }
         ggml_barrier(params->threadpool);
 
         for(int j = 0; j < ne11; j++) {
-            // g = 4
             if (ith == 0) {
-                // Transform tensor if not already transformed
-                // Although we have done this in file `llama.cpp`,
-                // we still need to do it here for non-model inference, e.g., test-backend-ops.cpp.
-                // It's better to do this in ggml-backend.c,
-                // but llama.cpp directly manipulates tensor.data for cbe in a lot of space.
-                ggml_bitnet_transform_tensor(src0);
-                GGML_ASSERT(src1->type == GGML_TYPE_F32);
-                bitnet_float_type * act_input;
-                act_input = src1->data;
-                ggml_preprocessor(ne01, ne00, act_input + (j * ne10), LUT_Scales, QLUT);
+                // use wdata-based qlut/lut_scales for better safety
+                ggml_preprocessor(ne01, ne00, act_input + (j * ne10), lut_scales, qlut);
             }
             ggml_barrier(params->threadpool);
 
@@ -12781,21 +12772,15 @@ UseGgmlVec_Dot_TL1:
 
             for (int tile = tile_start; tile < tile_end; tile++) {
                 const int ii = tile * BM;
-                ggml_qgemm_lut( ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
-                                QLUT, 
+                ggml_qgemm_lut( ne01, ne11, ne00, ii, j, ((uint8_t *)(src0->data)), 
+                                qlut, 
                                 &(wt->scales[0]), 
-                                LUT_Scales, 
+                                lut_scales, 
                                 act_output);
             }        
             ggml_barrier(params->threadpool); 
         }
 
-        //clean up
-        if (ith == 0) {
-            GGML_ALIGNED_FREE(QLUT);
-            GGML_ALIGNED_FREE(LUT_Scales);
-        }
-        ggml_barrier(params->threadpool);        
         return;
     }
 #endif
