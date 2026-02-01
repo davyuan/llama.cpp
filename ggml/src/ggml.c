@@ -12733,7 +12733,7 @@ UseGgmlVec_Dot_TL1:
         }
         ggml_barrier(params->threadpool);
 
-        for(int j = 0; j < ne11 - 1; j+2) {
+        for(int j = 0; j < ne11 - 1; j+=2) {
             if (ith == 0) {
                 // use wdata-based qlut/lut_scales for better safety
                 ggml_preprocessor(ne01, ne00, act_input + (j * ne10), &lut_scales[0], qlut);
