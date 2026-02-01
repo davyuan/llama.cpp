@@ -12739,7 +12739,7 @@ UseGgmlVec_Dot_TL1:
             ggml_preprocessor(ne01, ne10, act_input + ((j + 1) * ne10), &lut_scales[j + 1], qlut + (j + 1) * qlut_size_per_ne10);
 
             for (int ii = 0; ii < ne01; ii+= BM) {
-                ggml_qgemm_lut_2col( ne01, ne11, ne00, ii, j, ((uint8_t *)(src0->data)), 
+                ggml_qgemm_lut_2col( ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
                                 qlut + j * qlut_size_per_ne10,
                                 qlut + (j + 1) * qlut_size_per_ne10, 
                                 &(wt->scales[0]), 
@@ -12751,7 +12751,7 @@ UseGgmlVec_Dot_TL1:
         if((j_end - j_start) % 2 == 1) {
             ggml_preprocessor(ne01, ne10, act_input + ((j_end - 1) * ne10), &lut_scales[j_end - 1], qlut + (j_end - 1) * qlut_size_per_ne10);
             for (int ii = 0; ii < ne01; ii+= BM) {
-                ggml_qgemm_lut( ne01, ne11, ne10, ii, (ne11 -1), ((uint8_t *)(src0->data)), 
+                ggml_qgemm_lut( ne01, ne11, ne10, ii, (j_end - 1), ((uint8_t *)(src0->data)), 
                                 qlut + (j_end - 1) * qlut_size_per_ne10, 
                                 &(wt->scales[0]), 
                                 lut_scales + (j_end - 1), 
