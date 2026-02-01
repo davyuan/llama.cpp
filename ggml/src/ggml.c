@@ -12729,43 +12729,45 @@ UseGgmlVec_Dot_TL1:
         }
         ggml_barrier(params->threadpool);
 
-        // Grid partitioning that prioritizes thread affinity to specific LUTs (columns).
-        // This exactly matches the behavior of lut_micro_kernel in main.cpp.
-        const int n_ii = (ne01 + BM - 1) / BM;
-        const int n_j_units = (ne11 + 1) / 2;
-        const int total_tasks = n_j_units * n_ii;
+        // 1. Independent Column-Pair Processing (Prefill/Parallel Phase)
+        // Each thread processes its assigned column-pairs independently (no sync)
+        const int n_j_pairs = ne11 / 2;
+        const int j_pairs_per_thread = (n_j_pairs + nth - 1) / nth;
+        const int jp_start = ith * j_pairs_per_thread;
+        const int jp_end   = MIN((ith + 1) * j_pairs_per_thread, n_j_pairs);
 
-        const int t_per_th = (total_tasks + nth - 1) / nth;
-        const int t_start = ith * t_per_th;
-        const int t_end   = MIN((ith + 1) * t_per_th, total_tasks);
+        for (int jp = jp_start; jp < jp_end; jp++) {
+            int j = jp * 2;
+            // Thread-local LUT construction for private L1/L2 cache
+            ggml_preprocessor(ne01, ne10, act_input + (j * ne10), &lut_scales[j], qlut + j * qlut_size_per_ne10);
+            ggml_preprocessor(ne01, ne10, act_input + ((j + 1) * ne10), &lut_scales[j + 1], qlut + (j + 1) * qlut_size_per_ne10);
 
-        int last_u = -1;
-        for (int t = t_start; t < t_end; t++) {
-            int u_idx = t / n_ii;
-            int ii_idx = t % n_ii;
-            int j = u_idx * 2;
-            int ii = ii_idx * BM;
-
-            // Just-In-Time Preprocessing: Build the LUT in the same thread that uses it.
-            // This ensures the LUT data is hot in the L1/L2 cache of the current core.
-            if (u_idx != last_u) {
-                if (j < ne11) {
-                    ggml_preprocessor(ne01, ne10, act_input + (j * ne10), &lut_scales[j], qlut + j * qlut_size_per_ne10);
-                }
-                if (j + 1 < ne11) {
-                    ggml_preprocessor(ne01, ne10, act_input + ((j + 1) * ne10), &lut_scales[j + 1], qlut + (j + 1) * qlut_size_per_ne10);
-                }
-                last_u = u_idx;
-            }
-
-            if (j + 1 < ne11) {
+            for (int ii = 0; ii < ne01; ii += BM) {
                 ggml_qgemm_lut_2col(ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
                                     qlut + j * qlut_size_per_ne10,
                                     qlut + (j + 1) * qlut_size_per_ne10, 
                                     &(wt->scales[0]), 
                                     lut_scales + j, 
                                     act_output);
-            } else {
+            }
+        }
+
+        // 2. Synchronized Singleton Processing (Decoding Phase)
+        // If there's a remainder (e.g., N=1 decoding), all threads collaborate on the single column.
+        if (ne11 % 2 != 0) {
+            ggml_barrier(params->threadpool); // Ensure all pair work is done
+            int j = ne11 - 1;
+            if (ith == 0) {
+                ggml_preprocessor(ne01, ne10, act_input + (j * ne10), &lut_scales[j], qlut + j * qlut_size_per_ne10);
+            }
+            ggml_barrier(params->threadpool); // Wait for LUT construction
+
+            const int n_ii = (ne01 + BM - 1) / BM;
+            const int ii_per_thread = (n_ii + nth - 1) / nth;
+            const int ii_start = ith * ii_per_thread * BM;
+            const int ii_end   = MIN((ith + 1) * ii_per_thread * BM, ne01);
+
+            for (int ii = ii_start; ii < ii_end; ii += BM) {
                 ggml_qgemm_lut(ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
                                qlut + j * qlut_size_per_ne10, 
                                &(wt->scales[0]), 
