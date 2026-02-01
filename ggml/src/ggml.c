@@ -12621,7 +12621,7 @@ static void ggml_compute_forward_mul_mat(
     GGML_ASSERT(nb2 <= nb3);
 
 #if defined(GGML_BITNET_ARM_TL1)
-    if (src0->type == GGML_TYPE_F16 && src1->type == GGML_TYPE_F32) {
+    /*if (src0->type == GGML_TYPE_F16 && src1->type == GGML_TYPE_F32) {
         const int64_t r2 = ne12/ne02;
         const int64_t r3 = ne13/ne03;
 
@@ -12689,7 +12689,7 @@ UseGgmlVec_Dot_TL1:
             ggml_barrier(params->threadpool);
             return;
         }
-    }
+    }*/
 
     if (src0->type == GGML_TYPE_TL1) {
         if(!ggml_bitnet_can_mul_mat(src0, src1, dst) || sizeof(bitnet_float_type) != 4 ||
