@@ -12736,9 +12736,12 @@ UseGgmlVec_Dot_TL1:
         // 1. Independent Column-Pair Processing (Prefill/Parallel Phase)
         // Each thread processes its assigned column-pairs independently (no sync)
         const int n_j_pairs = ne11 / 2;
-        const int j_pairs_per_thread = (n_j_pairs + nth - 1) / nth;
-        const int jp_start = ith * j_pairs_per_thread;
-        const int jp_end   = MIN((ith + 1) * j_pairs_per_thread, n_j_pairs);
+        const int n_work_units = n_j_pairs;
+        const int units_per_thread = n_work_units / nth;
+        const int remainder = n_work_units % nth;
+
+        const int jp_start = ith * units_per_thread + MIN(ith, remainder);
+        const int jp_end   = (ith + 1) * units_per_thread + MIN(ith + 1, remainder);
 
         for (int jp = jp_start; jp < jp_end; jp++) {
             int j = jp * 2;
