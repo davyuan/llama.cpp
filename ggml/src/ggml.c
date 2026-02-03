@@ -12761,6 +12761,12 @@ UseGgmlVec_Dot_TL1:
         if (ne11 % 2 != 0) {
             ggml_barrier(params->threadpool); // Ensure all pair work is done
             int j = ne11 - 1;
+
+            if (ith == 0) {
+                *(lut_scales + j) = 0.0f;
+            }
+            ggml_barrier(params->threadpool); // Sync after reset
+
             const int n_blocks = ne10 / 16;
             const int b_start  = (n_blocks * ith) / nth;
             const int b_end    = (n_blocks * (ith + 1)) / nth;            
