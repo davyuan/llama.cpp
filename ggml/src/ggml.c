@@ -51,7 +51,6 @@ const int BK = 64;
 #endif
 #if defined(GGML_BITNET_ARM_TL1) || defined(GGML_BITNET_X86_TL2)
 #include "ggml-bitnet.h"
-#include "bitnet-lut-kernels.h"
 #endif
 
 #if defined(_MSC_VER)
@@ -12769,7 +12768,7 @@ UseGgmlVec_Dot_TL1:
             const int k_len   = (b_end - b_start) * 16;
             const float epsilon = 1e-7f;
 
-            float32_t local_max = (k_len > 0) ? get_tensor_max(k_len, act_input + (j * ne10) + k_start) : 0.0f;
+            float32_t local_max = (k_len > 0) ? ggml_get_tensor_max(k_len, act_input + (j * ne10) + k_start) : 0.0f;
             ggml_critical_section_start();
             {
                 if (local_max > *(lut_scales + j)) *(lut_scales + j) = local_max;
@@ -12785,7 +12784,7 @@ UseGgmlVec_Dot_TL1:
             ggml_barrier(params->threadpool); // Wait for scale calculation
             
             if (k_len > 0) {
-                lut_ctor(k_len, qlut + j * qlut_size_per_ne10 + k_start * 16, act_input + (j * ne10) + k_start, lut_scales + j);
+                ggml_lut_ctor(k_len, qlut + j * qlut_size_per_ne10 + k_start * 16, act_input + (j * ne10) + k_start, lut_scales + j);
             }
             ggml_barrier(params->threadpool); // Wait for LUT construction
 
