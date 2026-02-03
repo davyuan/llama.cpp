@@ -741,7 +741,11 @@ static const struct ggml_type_traits type_traits[GGML_TYPE_COUNT] = {
         .blck_size                = 1,
         .type_size                = sizeof(int8_t),
         .is_quantized             = true,
+#if defined(GGML_BITNET_ARM_TL1)
         .vec_dot                  = (ggml_vec_dot_t) ggml_vec_dot_tl1,
+#else
+        .vec_dot                  = (ggml_vec_dot_t) NULL,
+#endif
         .vec_dot_type             = GGML_TYPE_F32,
         .nrows                    = 1,
     },
