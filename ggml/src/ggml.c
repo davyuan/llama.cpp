@@ -12775,11 +12775,13 @@ UseGgmlVec_Dot_TL1:
             }
             ggml_critical_section_end();
 
+            ggml_barrier(params->threadpool); // Sync before scale calculation
+
             if(ith == 0) {
                 float32_t global_max = *(lut_scales + j);
                 *(lut_scales + j) = (global_max > epsilon) ? (127.0f / global_max) : 1.0f;
             }
-            ggml_barrier(params->threadpool); // Wait for LUT construction
+            ggml_barrier(params->threadpool); // Wait for scale calculation
             
             if (k_len > 0) {
                 lut_ctor(k_len, qlut + j * qlut_size_per_ne10 + k_start * 16, act_input + (j * ne10) + k_start, lut_scales + j);
