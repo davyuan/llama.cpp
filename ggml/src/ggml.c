@@ -12797,12 +12797,16 @@ UseGgmlVec_Dot_TL1:
             }
             ggml_barrier(params->threadpool); // Wait for LUT construction
 
-            const int n_ii = (ne01 + BM - 1) / BM;
-            const int ii_per_thread = (n_ii + nth - 1) / nth;
-            const int ii_start = ith * ii_per_thread * BM;
-            const int ii_end   = MIN((ith + 1) * ii_per_thread * BM, ne01);
+            const int n_ii = ne01 / BM;
+            const int n_work_units = n_ii;
+            const int units_per_thread = n_work_units / nth;
+            const int remainder = n_work_units % nth;
 
-            for (int ii = ii_start; ii < ii_end; ii += BM) {
+            const int blocks_start = ith * units_per_thread + MIN(ith, remainder);
+            const int blocks_end   = (ith + 1) * units_per_thread + MIN(ith + 1, remainder);
+
+            for (int b = blocks_start; b < blocks_end; b++) {
+                int ii = b * BM;
                 ggml_qgemm_lut(ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
                                qlut + j * qlut_size_per_ne10, 
                                &(wt->scales[0]), 
