@@ -12757,8 +12757,28 @@ UseGgmlVec_Dot_TL1:
         if (ne11 % 2 != 0) {
             ggml_barrier(params->threadpool); // Ensure all pair work is done
             int j = ne11 - 1;
-            if (ith == 0) {
-                ggml_preprocessor(ne01, ne10, act_input + (j * ne10), &lut_scales[j], qlut + j * qlut_size_per_ne10);
+            const int n_blocks = ne10 / 16;
+            const int b_start  = (n_blocks * ith) / nth;
+            const int b_end    = (n_blocks * (ith + 1)) / nth;            
+            const int k_start = b_start * 16;
+            const int k_len   = (b_end - b_start) * 16;
+            const float epsilon = 1e-7f;
+
+            float32_t local_max = (k_len > 0) ? get_tensor_max(k_len, act_input + (j * ne10) + k_start) : 0.0f;
+            ggml_critical_section_start();
+            {
+                if (local_max > *(lut_scales + j)) *(lut_scales + j) = local_max;
+            }
+            ggml_critical_section_end();
+
+            if(ith == 0) {
+                float32_t global_max = *(lut_scales + j);
+                *(lut_scales + j) = (global_max > epsilon) ? (127.0f / global_max) : 1.0f;
+            }
+            ggml_barrier(params->threadpool); // Wait for LUT construction
+            
+            if (k_len > 0) {
+                lut_ctor(k_len, qlut + j * qlut_size_per_ne10 + k_start * 16, act_input + (j * ne10) + k_start, lut_scales + j);
             }
             ggml_barrier(params->threadpool); // Wait for LUT construction
 
