@@ -14,7 +14,7 @@
 #include <alloca.h>
 #endif
 
-const int BM = 128;
+const int BM = 256;
 const int BK = 64;
 
 #include <assert.h>
