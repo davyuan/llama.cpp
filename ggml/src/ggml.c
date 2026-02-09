@@ -12749,13 +12749,26 @@ UseGgmlVec_Dot_TL1:
             ggml_preprocessor(ne01, ne10, act_input + (j * ne10), &lut_scales[j], qlut + j * qlut_size_per_ne10);
             ggml_preprocessor(ne01, ne10, act_input + ((j + 1) * ne10), &lut_scales[j + 1], qlut + (j + 1) * qlut_size_per_ne10);
 
-            for (int ii = 0; ii < ne01; ii += BM) {
-                ggml_qgemm_lut_2col(ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
-                                    qlut + j * qlut_size_per_ne10,
-                                    qlut + (j + 1) * qlut_size_per_ne10, 
-                                    &(wt->scales[0]), 
-                                    lut_scales + j, 
-                                    act_output);
+            if (ne01 % BM == 0) {
+                for (int ii = 0; ii < ne01; ii += BM) {
+                    ggml_qgemm_lut_2col_256(ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
+                                        qlut + j * qlut_size_per_ne10,
+                                        qlut + (j + 1) * qlut_size_per_ne10, 
+                                        &(wt->scales[0]), 
+                                        lut_scales + j, 
+                                        act_output);
+                }
+            } else if (ne01 % 160 == 0) {
+                for (int ii = 0; ii < ne01; ii += 160) {
+                    ggml_qgemm_lut_2col_160(ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
+                                        qlut + j * qlut_size_per_ne10,
+                                        qlut + (j + 1) * qlut_size_per_ne10, 
+                                        &(wt->scales[0]), 
+                                        lut_scales + j, 
+                                        act_output);
+                }
+            } else {
+                GGML_ASSERT(false && "Unsupported ne01 size for column-pair processing");
             }
         }
 
