@@ -12797,22 +12797,42 @@ UseGgmlVec_Dot_TL1:
             }
             ggml_barrier(params->threadpool); // Wait for LUT construction
 
-            const int n_ii = ne01 / BM;
-            const int n_work_units = n_ii;
-            const int units_per_thread = n_work_units / nth;
-            const int remainder = n_work_units % nth;
+            if(ne01 % BM == 0) {
+                const int n_ii = ne01 / BM;
+                const int n_work_units = n_ii;
+                const int units_per_thread = n_work_units / nth;
+                const int remainder = n_work_units % nth;
 
-            const int blocks_start = ith * units_per_thread + MIN(ith, remainder);
-            const int blocks_end   = (ith + 1) * units_per_thread + MIN(ith + 1, remainder);
+                const int blocks_start = ith * units_per_thread + MIN(ith, remainder);
+                const int blocks_end   = (ith + 1) * units_per_thread + MIN(ith + 1, remainder);
 
-            for (int b = blocks_start; b < blocks_end; b++) {
-                int ii = b * BM;
-                ggml_qgemm_lut(ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
-                               qlut + j * qlut_size_per_ne10, 
-                               &(wt->scales[0]), 
-                               lut_scales + j, 
-                               act_output);
-            }
+                for (int b = blocks_start; b < blocks_end; b++) {
+                    int ii = b * BM;
+                    ggml_qgemm_lut(ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
+                                qlut + j * qlut_size_per_ne10, 
+                                &(wt->scales[0]), 
+                                lut_scales + j, 
+                                act_output);
+                }
+            } else if(ne01 % 160 == 0){
+                const int n_ii = ne01 / 160;
+                const int n_work_units = n_ii;
+                const int units_per_thread = n_work_units / nth;
+                const int remainder = n_work_units % nth;
+
+                const int blocks_start = ith * units_per_thread + MIN(ith, remainder);
+                const int blocks_end   = (ith + 1) * units_per_thread + MIN(ith + 1, remainder);
+
+                for (int b = blocks_start; b < blocks_end; b++) {
+                    int ii = b * 160;
+                    ggml_qgemm_lut_160(ne01, ne11, ne10, ii, j, ((uint8_t *)(src0->data)), 
+                                qlut + j * qlut_size_per_ne10, 
+                                &(wt->scales[0]), 
+                                lut_scales + j, 
+                                act_output);
+                }
+            } else
+                GGML_ASSERT(false && "Unsupported ne01 size for singleton column processing");
         }
         return;
     }
