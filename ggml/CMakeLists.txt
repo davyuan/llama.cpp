@@ -120,8 +120,8 @@ option(GGML_BLAS                            "ggml: use BLAS"                    
 set(GGML_BLAS_VENDOR ${GGML_BLAS_VENDOR_DEFAULT} CACHE STRING
                                             "ggml: BLAS library vendor")
 
-if (APPLE AND NOT GGML_ACCELERATE AND GGML_BLAS AND GGML_BLAS_VENDOR MATCHES "Apple")
-    message(STATUS "GGML_BLAS forced OFF: Apple BLAS vendor requires Accelerate, but GGML_ACCELERATE is OFF")
+if (APPLE AND NOT GGML_ACCELERATE AND GGML_BLAS)
+    message(STATUS "GGML_BLAS forced OFF: Apple build with GGML_ACCELERATE=OFF disables BLAS backend")
     set(GGML_BLAS OFF CACHE BOOL "ggml: use BLAS" FORCE)
 endif()
 

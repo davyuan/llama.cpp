@@ -69,8 +69,8 @@ if (APPLE AND GGML_ACCELERATE)
     endif()
 endif()
 
-if (APPLE AND GGML_BLAS AND NOT GGML_ACCELERATE AND GGML_BLAS_VENDOR MATCHES "Apple")
-    message(STATUS "GGML_BLAS disabled: Apple BLAS vendor depends on Accelerate, but GGML_ACCELERATE is OFF")
+if (APPLE AND GGML_BLAS AND NOT GGML_ACCELERATE)
+    message(STATUS "GGML_BLAS disabled: Apple build with GGML_ACCELERATE=OFF disables BLAS backend")
     set(GGML_BLAS OFF)
 endif()
 
@@ -1354,6 +1354,11 @@ endif()
 #
 
 # ggml
+
+if (NOT GGML_BLAS)
+    unset(GGML_SOURCES_BLAS)
+    unset(GGML_HEADERS_BLAS)
+endif()
 
 add_library(ggml
             ../include/ggml.h
