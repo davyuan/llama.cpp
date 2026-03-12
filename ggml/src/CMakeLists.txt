@@ -1,4 +1,5 @@
 include(CheckCXXCompilerFlag)
+include(CheckCXXSourceCompiles)
 
 unset(GGML_CDEF_PUBLIC)
 
@@ -29,18 +30,30 @@ endif()
 unset(GGML_EXTRA_LIBS_PRIVATE)
 unset(GGML_EXTRA_LIBS_PUBLIC)
 
+if (APPLE)
+    check_cxx_source_compiles(
+        "int main() { if (__builtin_available(visionOS 2.5, *)) {} return 0; }"
+        GGML_HAS_BUILTIN_AVAILABLE_VISIONOS)
+else()
+    set(GGML_HAS_BUILTIN_AVAILABLE_VISIONOS OFF)
+endif()
+
 if (APPLE AND GGML_ACCELERATE)
-    find_library(ACCELERATE_FRAMEWORK Accelerate)
-    if (ACCELERATE_FRAMEWORK)
-        message(STATUS "Accelerate framework found")
-
-        add_compile_definitions(GGML_USE_ACCELERATE)
-        add_compile_definitions(ACCELERATE_NEW_LAPACK)
-        add_compile_definitions(ACCELERATE_LAPACK_ILP64)
-
-        list(APPEND GGML_EXTRA_LIBS_PRIVATE ${ACCELERATE_FRAMEWORK})
+    if (NOT GGML_HAS_BUILTIN_AVAILABLE_VISIONOS)
+        message(STATUS "Accelerate framework skipped because the compiler cannot parse visionOS availability checks")
     else()
-        message(WARNING "Accelerate framework not found")
+        find_library(ACCELERATE_FRAMEWORK Accelerate)
+        if (ACCELERATE_FRAMEWORK)
+            message(STATUS "Accelerate framework found")
+
+            add_compile_definitions(GGML_USE_ACCELERATE)
+            add_compile_definitions(ACCELERATE_NEW_LAPACK)
+            add_compile_definitions(ACCELERATE_LAPACK_ILP64)
+
+            list(APPEND GGML_EXTRA_LIBS_PRIVATE ${ACCELERATE_FRAMEWORK})
+        else()
+            message(WARNING "Accelerate framework not found")
+        endif()
     endif()
 endif()
 
