@@ -69,6 +69,11 @@ if (APPLE AND GGML_ACCELERATE)
     endif()
 endif()
 
+if (APPLE AND GGML_BLAS AND NOT GGML_ACCELERATE AND GGML_BLAS_VENDOR MATCHES "Apple")
+    message(STATUS "GGML_BLAS disabled: Apple BLAS vendor depends on Accelerate, but GGML_ACCELERATE is OFF")
+    set(GGML_BLAS OFF)
+endif()
+
 if (GGML_METAL)
     find_library(FOUNDATION_LIBRARY Foundation REQUIRED)
     find_library(METAL_FRAMEWORK    Metal      REQUIRED)
