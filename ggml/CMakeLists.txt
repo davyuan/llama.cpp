@@ -119,6 +119,12 @@ option(GGML_ACCELERATE                      "ggml: enable Accelerate framework" 
 option(GGML_BLAS                            "ggml: use BLAS"                                  ${GGML_BLAS_DEFAULT})
 set(GGML_BLAS_VENDOR ${GGML_BLAS_VENDOR_DEFAULT} CACHE STRING
                                             "ggml: BLAS library vendor")
+
+if (APPLE AND NOT GGML_ACCELERATE AND GGML_BLAS AND GGML_BLAS_VENDOR MATCHES "Apple")
+    message(STATUS "GGML_BLAS forced OFF: Apple BLAS vendor requires Accelerate, but GGML_ACCELERATE is OFF")
+    set(GGML_BLAS OFF CACHE BOOL "ggml: use BLAS" FORCE)
+endif()
+
 option(GGML_LLAMAFILE                       "ggml: use LLAMAFILE"                             ${GGML_LLAMAFILE_DEFAULT})
 
 option(GGML_CUDA                            "ggml: use CUDA"                                  OFF)
