@@ -1,5 +1,6 @@
 include(CheckCXXCompilerFlag)
 include(CheckCXXSourceCompiles)
+include(CheckCSourceCompiles)
 
 unset(GGML_CDEF_PUBLIC)
 
@@ -31,10 +32,21 @@ unset(GGML_EXTRA_LIBS_PRIVATE)
 unset(GGML_EXTRA_LIBS_PUBLIC)
 
 if (APPLE)
+    check_c_source_compiles(
+        "int main(void) { if (__builtin_available(visionOS 2.5, *)) {} return 0; }"
+        GGML_HAS_C_BUILTIN_AVAILABLE_VISIONOS)
     check_cxx_source_compiles(
         "int main() { if (__builtin_available(visionOS 2.5, *)) {} return 0; }"
-        GGML_HAS_BUILTIN_AVAILABLE_VISIONOS)
+        GGML_HAS_CXX_BUILTIN_AVAILABLE_VISIONOS)
+
+    if (GGML_HAS_C_BUILTIN_AVAILABLE_VISIONOS AND GGML_HAS_CXX_BUILTIN_AVAILABLE_VISIONOS)
+        set(GGML_HAS_BUILTIN_AVAILABLE_VISIONOS ON)
+    else()
+        set(GGML_HAS_BUILTIN_AVAILABLE_VISIONOS OFF)
+    endif()
 else()
+    set(GGML_HAS_C_BUILTIN_AVAILABLE_VISIONOS OFF)
+    set(GGML_HAS_CXX_BUILTIN_AVAILABLE_VISIONOS OFF)
     set(GGML_HAS_BUILTIN_AVAILABLE_VISIONOS OFF)
 endif()
 
